@@ -2,9 +2,7 @@ name: Cozy Village Tick
 
 on:
   schedule:
-    # Run every 5 minutes
     - cron: "*/5 * * * *"
-  # Allow manual runs from the Actions tab
   workflow_dispatch: {}
 
 jobs:
@@ -16,5 +14,6 @@ jobs:
         run: |
           curl -X POST \
             -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}" \
             -H "x-cron-secret: ${{ secrets.CRON_SECRET }}" \
-            https://bnkbkqqlnfzczwwczrta.supabase.co/functions/v1/tick
+            https://bnkbkqqlnfzczwwczrta.functions.supabase.co/tick
