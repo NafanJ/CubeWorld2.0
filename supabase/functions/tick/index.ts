@@ -1,7 +1,7 @@
 // supabase/functions/tick/index.ts
 // Disable TS checking in editors that don't understand Deno.
 // This does not affect runtime on Supabase.
- // @ts-nocheck
+// @ts-nocheck
 
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -35,7 +35,7 @@ async function getAgents(): Promise<Agent[]> {
   const { data, error } = await supabase
     .from("agents")
     .select("id, name, provider, model, room_id, is_active")
-    .eq("is_active", true); // ✅ matches your schema
+    .eq("is_active", true);
 
   if (error) {
     console.error("Error fetching agents:", error);
@@ -46,19 +46,24 @@ async function getAgents(): Promise<Agent[]> {
 }
 
 async function generateMessage(agent: Agent): Promise<string> {
-  // Fallback if no OpenAI key set
-  if (!openai) {
-    const cosyLines = [
-      "makes a cup of tea and watches the rain.",
-      "rearranges their bookshelf in quiet concentration.",
-      "leans on the windowsill, listening to the city hush.",
-      "scribbles a small note in their journal.",
-      "straightens the cushions and hums softly."
-    ];
+  const cosyLines = [
+    "makes a cup of tea and watches the rain."/*,
+    "rearranges their bookshelf in quiet concentration.",
+    "leans on the windowsill, listening to the city hush.",
+    "scribbles a small note in their journal.",
+    "straightens the cushions and hums softly.",
+    "brushes crumbs off the table and smiles to themself.",
+    "adjusts a picture frame until it feels just right."*/
+  ];
 
-    const line =
-      cosyLines[Math.floor(Math.random() * cosyLines.length)];
+  function randomCosyLine() {
+    const line = cosyLines[Math.floor(Math.random() * cosyLines.length)];
     return `${agent.name} ${line}`;
+  }
+
+  // Fallback if no OpenAI key set at all
+  if (!openai) {
+    return randomCosyLine();
   }
 
   const prompt = `
@@ -69,9 +74,9 @@ Keep it gentle, slice-of-life, and grounded. No quotes, no emojis, no dialogue.
 Just the line, nothing else.
 `;
 
-  try {
+  async function callOnce(): Promise<string | null> {
     const response = await openai.chat.completions.create({
-      model: agent.model || "gpt-4.1-mini",
+      model: "gpt-4.1-mini",
       messages: [
         {
           role: "system",
@@ -82,17 +87,49 @@ Just the line, nothing else.
       ]
     });
 
-    const content =
-      response.choices[0]?.message?.content?.trim() ?? "";
+    const content = response.choices[0]?.message?.content?.trim() ?? "";
+    return content || null;
+  }
 
-    if (!content) {
-      return `${agent.name} sits quietly, listening to the building breathe.`;
+  try {
+    // First attempt
+    const first = await callOnce();
+    if (first) return first;
+
+    // If we somehow got empty content, just fall back
+    return randomCosyLine();
+  } catch (err: any) {
+    const status = err?.status ?? err?.response?.status;
+    const message = err?.message ?? err?.toString?.() ?? "unknown error";
+
+    console.error("OpenAI error on first try:", status, message);
+
+    // If rate limited, wait a bit and retry once
+    if (status === 429) {
+      const jitter = Math.floor(Math.random() * 300); // 0–300ms
+      await new Promise((resolve) =>
+        setTimeout(resolve, 500 + jitter)
+      );
+
+      try {
+        const second = await callOnce();
+        if (second) return second;
+
+        console.error("OpenAI 429 retry returned empty content");
+      } catch (err2: any) {
+        const status2 = err2?.status ?? err2?.response?.status;
+        const message2 =
+          err2?.message ?? err2?.toString?.() ?? "unknown error";
+        console.error(
+          "OpenAI error on retry after 429:",
+          status2,
+          message2
+        );
+      }
     }
 
-    return content;
-  } catch (err) {
-    console.error("OpenAI error:", err);
-    return `${agent.name} sits quietly, listening to the building breathe.`;
+    // Any failure path ends up here
+    return randomCosyLine();
   }
 }
 
@@ -115,22 +152,21 @@ serve(async (req) => {
     let inserted = 0;
 
     for (const agent of agents) {
-      if (!agent.room_id) continue; // skip agents not placed in a room
+      if (!agent.room_id) continue; // skip agents without a room
 
       const content = await generateMessage(agent);
 
       const { error } = await supabase.from("messages").insert({
-        from_agent: agent.id,   // ✅ matches schema
-        room_id: agent.room_id, // uuid
-        content                  // text
-        // ts will use the DB default (now())
+        from_agent: agent.id,
+        room_id: agent.room_id,
+        content
+        // ts defaults to now()
         // mood_tag left null for now
       });
 
       if (error) {
         console.error("Error inserting message:", error);
-        // don't throw – keep ticking for other agents
-        continue;
+        continue; // continue ticking other agents
       }
 
       inserted += 1;
