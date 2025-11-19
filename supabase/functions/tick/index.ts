@@ -16,6 +16,14 @@ type Agent = {
   is_active: boolean | null;
 };
 
+type MessageSummary = {
+  id: number;
+  ts: string;
+  from_agent: string;
+  room_id: string | null;
+  content: string | null;
+};
+
 const supabaseUrl =
   Deno.env.get("PROJECT_URL") ?? Deno.env.get("SUPABASE_URL") ?? "";
 const serviceRoleKey =
@@ -45,15 +53,54 @@ async function getAgents(): Promise<Agent[]> {
   return (data ?? []) as Agent[];
 }
 
-async function generateMessage(agent: Agent): Promise<string> {
+/**
+ * Fetch recent messages and group them by agent.
+ * We fetch e.g. 200 most recent and keep up to `limitPerAgent` per agent.
+ */
+async function getRecentMessagesByAgent(
+  limitPerAgent = 10
+): Promise<Map<string, MessageSummary[]>> {
+  const historyByAgent = new Map<string, MessageSummary[]>();
+
+  const { data, error } = await supabase
+    .from("messages")
+    .select("id, ts, from_agent, room_id, content")
+    .order("ts", { ascending: false })
+    .limit(200); // plenty for 6 agents × 10 each
+
+  if (error) {
+    console.error("Error fetching recent messages:", error);
+    return historyByAgent;
+  }
+
+  const rows = (data ?? []) as MessageSummary[];
+
+  for (const row of rows) {
+    const key = row.from_agent;
+    if (!key) continue;
+
+    const arr = historyByAgent.get(key) ?? [];
+    if (arr.length >= limitPerAgent) continue;
+
+    arr.push(row);
+    historyByAgent.set(key, arr);
+  }
+
+  return historyByAgent;
+}
+
+async function generateMessage(
+  agent: Agent,
+  history: MessageSummary[]
+): Promise<string> {
   const cosyLines = [
-    "makes a cup of tea and watches the rain."/*,
+    "makes a cup of tea and watches the rain.",
     "rearranges their bookshelf in quiet concentration.",
     "leans on the windowsill, listening to the city hush.",
     "scribbles a small note in their journal.",
     "straightens the cushions and hums softly.",
     "brushes crumbs off the table and smiles to themself.",
-    "adjusts a picture frame until it feels just right."*/
+    "adjusts a picture frame until it feels just right."
   ];
 
   function randomCosyLine() {
@@ -66,22 +113,38 @@ async function generateMessage(agent: Agent): Promise<string> {
     return randomCosyLine();
   }
 
+  // Build a compact history summary for this agent
+  const recentLines = history
+    .map((m) => m.content?.trim())
+    .filter((c): c is string => !!c)
+    .slice(0, 10);
+
+  const recentHistoryText =
+    recentLines.length > 0
+      ? recentLines.map((c) => `- ${c}`).join("\n")
+      : "(no recent actions recorded)";
+
   const prompt = `
 You are a cosy, low-key villager called ${agent.name} in a tiny 2x3 apartment block called Cozy Village.
 You belong to provider "${agent.provider}".
-Write ONE short, present-tense line (max ~80 characters) describing what you are doing right now.
-Keep it gentle, slice-of-life, and grounded. No quotes, no emojis, no dialogue.
-Just the line, nothing else.
+
+Here are the last few things you have been doing recently, in order from newest to older:
+
+${recentHistoryText}
+
+Now, write ONE new short, present-tense line (max ~80 characters) describing what you are doing right now in your room.
+Keep it gentle, slice-of-life, and grounded. Avoid repeating the exact same actions or wording as above.
+No quotes, no emojis, no dialogue. Just the line, nothing else.
 `;
 
   async function callOnce(): Promise<string | null> {
     const response = await openai.chat.completions.create({
-      model: "gpt-4.1-mini",
+      model: agent.model || "gpt-4.1-mini",
       messages: [
         {
           role: "system",
           content:
-            "You write very short, cosy present-tense lines describing tiny actions."
+            "You write very short, cosy present-tense lines describing tiny actions. You must output only the line, no commentary."
         },
         { role: "user", content: prompt }
       ]
@@ -96,7 +159,7 @@ Just the line, nothing else.
     const first = await callOnce();
     if (first) return first;
 
-    // If we somehow got empty content, just fall back
+    // Empty content, just fall back
     return randomCosyLine();
   } catch (err: any) {
     const status = err?.status ?? err?.response?.status;
@@ -104,7 +167,7 @@ Just the line, nothing else.
 
     console.error("OpenAI error on first try:", status, message);
 
-    // If rate limited, wait a bit and retry once
+    // If rate limited, wait briefly and retry once
     if (status === 429) {
       const jitter = Math.floor(Math.random() * 300); // 0–300ms
       await new Promise((resolve) =>
@@ -128,7 +191,7 @@ Just the line, nothing else.
       }
     }
 
-    // Any failure path ends up here
+    // Any failure path: cosy fallback
     return randomCosyLine();
   }
 }
@@ -149,12 +212,15 @@ serve(async (req) => {
     }
 
     const agents = await getAgents();
+    const historyByAgent = await getRecentMessagesByAgent(10);
+
     let inserted = 0;
 
     for (const agent of agents) {
       if (!agent.room_id) continue; // skip agents without a room
 
-      const content = await generateMessage(agent);
+      const history = historyByAgent.get(agent.id) ?? [];
+      const content = await generateMessage(agent, history);
 
       const { error } = await supabase.from("messages").insert({
         from_agent: agent.id,
