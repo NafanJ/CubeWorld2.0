@@ -13,34 +13,34 @@ interface Room {
 
 const initialRooms: Room[] = [{
   color: 'red',
-  character: '🧑',
+  character: '/sprites/homer.png',
   status: 'online',
   backgroundImage: '/rooms/room1.png'
 }, {
   color: 'orange',
-  character: '👨',
+  character: '/sprites/homer.png',
   status: 'online',
-  backgroundImage: ''
+  backgroundImage: '/rooms/room1.png'
 }, {
   color: 'green',
-  character: '👩',
+  character: '/sprites/homer.png',
   status: 'online',
-  backgroundImage: ''
+  backgroundImage: '/rooms/room1.png'
 }, {
   color: 'blue',
-  character: '🧑',
+  character: '/sprites/homer.png',
   status: 'online',
-  backgroundImage: ''
+  backgroundImage: '/rooms/room1.png'
 }, {
   color: 'purple',
-  character: '👨',
+  character: '/sprites/homer.png',
   status: 'online',
-  backgroundImage: ''
+  backgroundImage: '/rooms/room1.png'
 }, {
   color: 'teal',
-  character: '👩',
+  character: '/sprites/homer.png',
   status: 'online',
-  backgroundImage: ''
+  backgroundImage: '/rooms/room1.png'
 }];
 
 export const PixelRoomGrid: React.FC = () => {

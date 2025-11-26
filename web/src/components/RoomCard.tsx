@@ -28,11 +28,21 @@ export function RoomCard({
         className={`${!backgroundImage ? roomBgs[color as keyof typeof roomBgs] : ''} w-full h-full relative overflow-hidden pixel-room`}
         style={backgroundImage ? { backgroundImage: `url(${backgroundImage})`, backgroundSize: '100% 100%', backgroundRepeat: 'no-repeat', backgroundPosition: 'center' } : undefined}
       >
-        {/* Animated Character */}
+        {/* Animated Character Sprite */}
         <div className="character-walk absolute bottom-6" style={{
         animationDelay: `${Math.random() * 3}s`
       }}>
-          <div className="text-4xl pixel-character">{character}</div>
+          <img 
+            src={character} 
+            alt="character sprite" 
+            className="pixel-character sprite-walking"
+            style={{
+              width: '48px',
+              height: '48px',
+              imageRendering: 'pixelated',
+              display: 'block'
+            }}
+          />
         </div>
 
         {/* Room name label (top-left) */}
