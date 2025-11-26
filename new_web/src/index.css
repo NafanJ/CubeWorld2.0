@@ -1,0 +1,102 @@
+/* URL IMPORTS (SUCH AS FONT IMPORTS) SHOULD BE KEPT ABOVE TAILWIND IMPORTS - DO NOT DELETE THIS COMMENT */
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+/* PLEASE NOTE: THESE TAILWIND IMPORTS SHOULD NEVER BE DELETED - DO NOT DELETE THIS COMMENT */
+@import 'tailwindcss/base';
+@import 'tailwindcss/components';
+@import 'tailwindcss/utilities';
+/* DO NOT DELETE THESE TAILWIND IMPORTS, OTHERWISE THE STYLING WILL NOT RENDER AT ALL - DO NOT DELETE THIS COMMENT */
+
+/* Pixel Art Styling */
+.pixel-text {
+  font-family: 'Press Start 2P', cursive;
+  image-rendering: pixelated;
+  -webkit-font-smoothing: none;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.pixel-border {
+  box-shadow: 
+    inset 4px 4px 0 rgba(255, 255, 255, 0.3),
+    inset -4px -4px 0 rgba(0, 0, 0, 0.3);
+}
+
+.pixel-border-sm {
+  box-shadow: 
+    inset 2px 2px 0 rgba(255, 255, 255, 0.4),
+    inset -2px -2px 0 rgba(0, 0, 0, 0.2);
+}
+
+.pixel-border-bottom {
+  box-shadow: inset 0 -4px 0 rgba(0, 0, 0, 0.3);
+}
+
+.pixel-room {
+  image-rendering: pixelated;
+  box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.2);
+}
+
+.pixel-character {
+  filter: drop-shadow(2px 2px 0 rgba(0, 0, 0, 0.5));
+}
+
+/* Character Walking Animation */
+@keyframes walk {
+  0%, 100% {
+    left: 10%;
+    transform: scaleX(1);
+  }
+  48% {
+    left: 85%;
+    transform: scaleX(1);
+  }
+  50% {
+    left: 85%;
+    transform: scaleX(-1);
+  }
+  98% {
+    left: 10%;
+    transform: scaleX(-1);
+  }
+}
+
+.character-walk {
+  animation: walk 8s ease-in-out infinite;
+}
+
+/* Message Slide In Animation */
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-slide-in {
+  animation: slideIn 0.3s ease-out;
+}
+
+/* Smooth scrollbar */
+::-webkit-scrollbar {
+  width: 12px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.1);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 6px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.5);
+  background-clip: padding-box;
+}
