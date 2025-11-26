@@ -3,6 +3,28 @@ import { ChatMessage } from './ChatMessage';
 import { SendIcon } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
+// Shared palette for agent colors (kept at module scope so hooks don't need it as a dependency)
+const PALETTE = [
+  'red',
+  'orange',
+  'green',
+  'blue',
+  'purple',
+  'teal',
+  'yellow',
+  'pink',
+  'indigo',
+  'lime',
+  'amber',
+  'rose',
+  'cyan',
+  'sky',
+  'violet',
+  'emerald',
+  'fuchsia',
+  'slate'
+];
+
 type SupaMessage = {
   id: number;
   content: string;
@@ -23,7 +45,9 @@ export function ChatPanel() {
   const [messages, setMessages] = useState<SupaMessage[]>([]);
   const [agentMap, setAgentMap] = useState<Record<string, string>>({});
   const [selectedAgent, setSelectedAgent] = useState<string>('all');
+  const [agentColorMap, setAgentColorMap] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
+
 
   useEffect(() => {
     let mounted = true;
@@ -69,6 +93,17 @@ export function ChatPanel() {
         if (a?.id && a?.name) map[a.id] = a.name;
       }
       setAgentMap(map);
+      // assign unique colors to agents (deterministic and stable)
+      const ids = Object.keys(map).sort((a, b) => map[a].localeCompare(map[b]));
+      const colorMap: Record<string, string> = {};
+      const used = new Set<string>();
+      for (let i = 0; i < ids.length; i++) {
+        const id = ids[i];
+        const c = PALETTE.find((p: string) => !used.has(p)) || PALETTE[i % PALETTE.length];
+        colorMap[id] = c;
+        used.add(c);
+      }
+      setAgentColorMap(colorMap);
     };
 
     loadAgents();
@@ -84,8 +119,19 @@ export function ChatPanel() {
           const oldRow = payload.old as { id: string } | null;
           if (newRow && newRow.id && newRow.name) {
             setAgentMap((prev) => ({ ...prev, [newRow.id]: newRow.name as string }));
+            setAgentColorMap((prev) => {
+              if (prev[newRow.id]) return prev; // already assigned
+              const used = new Set(Object.values(prev));
+              const c = PALETTE.find((p: string) => !used.has(p)) || PALETTE[Object.keys(prev).length % PALETTE.length];
+              return { ...prev, [newRow.id]: c };
+            });
           } else if (oldRow && oldRow.id && payload.event === 'DELETE') {
             setAgentMap((prev) => {
+              const copy = { ...prev };
+              delete copy[oldRow.id];
+              return copy;
+            });
+            setAgentColorMap((prev) => {
               const copy = { ...prev };
               delete copy[oldRow.id];
               return copy;
@@ -168,9 +214,13 @@ export function ChatPanel() {
           const username = (raw && agentMap[raw]) || raw || 'Anon';
           const avatar = username ? username[0] : '🙂';
           const time = formatTime(msg.ts);
-          // pick a color deterministically from username
-          const colors = ['red', 'orange', 'green', 'blue', 'purple', 'teal'];
-          const color = colors[Math.abs(hashString(username)) % colors.length];
+          // choose a color: prefer agent id's assigned unique color, otherwise fallback to deterministic pick
+          let color = 'slate';
+          if (msg.from_agent && agentColorMap[msg.from_agent]) {
+            color = agentColorMap[msg.from_agent];
+          } else {
+            color = PALETTE[Math.abs(hashString(username)) % PALETTE.length];
+          }
 
           return (
             <ChatMessage
