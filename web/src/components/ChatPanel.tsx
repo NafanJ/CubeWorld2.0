@@ -37,7 +37,7 @@ export function ChatPanel() {
         // eslint-disable-next-line no-console
         console.error('Error loading messages', error);
       } else if (mounted && data) {
-        setMessages(data as SupaMessage[]);
+        setMessages((data as SupaMessage[]).reverse());
       }
       setLoading(false);
     };
@@ -57,7 +57,7 @@ export function ChatPanel() {
         { event: 'INSERT', schema: 'public', table: 'messages' },
         (payload: any) => {
           const m = payload.new as SupaMessage;
-          setMessages((prev) => [m, ...prev].slice(0, 100));
+          setMessages((prev) => [...prev, m].slice(-100));
         }
       )
       .subscribe();
