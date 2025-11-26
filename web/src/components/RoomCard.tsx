@@ -3,6 +3,7 @@ interface RoomCardProps {
   color: string;
   character: string;
   username: string;
+  roomName?: string;
   status: string;
   backgroundImage?: string;
 }
@@ -10,6 +11,7 @@ export function RoomCard({
   color,
   character,
   username,
+  roomName,
   status,
   backgroundImage
 }: RoomCardProps) {
@@ -33,7 +35,14 @@ export function RoomCard({
           <div className="text-4xl pixel-character">{character}</div>
         </div>
 
-        {/* Username label */}
+        {/* Room name label (top-left) */}
+        {roomName && (
+          <div className="absolute top-2 left-2 bg-black bg-opacity-70 px-2 py-1 rounded border border-white">
+            <p className="text-white text-[8px] pixel-text">{roomName}</p>
+          </div>
+        )}
+
+        {/* Username label (bottom-left) */}
         <div className="absolute bottom-2 left-2 bg-black bg-opacity-70 px-2 py-1 rounded border border-white">
           <p className="text-white text-[8px] pixel-text">{username}</p>
         </div>
