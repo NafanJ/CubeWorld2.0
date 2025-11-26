@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "../src/lib/supabase";
+import RoomCard from "../src/components/RoomCard";
 
 type Room = {
   id: string;
@@ -34,7 +35,6 @@ type RoomWithAgent = Room & {
 };
 
 function formatTime(ts: string): string {
-  // ISO timestamp → HH:MM (deterministic, hydration-safe)
   return ts.slice(11, 16);
 }
 
@@ -53,7 +53,6 @@ export default function HomePage() {
     [rooms]
   );
 
-  // Initial load
   useEffect(() => {
     const load = async () => {
       setLoading(true);
@@ -102,7 +101,6 @@ export default function HomePage() {
     load();
   }, []);
 
-  // Realtime subscription
   useEffect(() => {
     const channel = supabase
       .channel("messages-stream")
@@ -116,25 +114,27 @@ export default function HomePage() {
       )
       .subscribe();
 
-    // IMPORTANT: don't return the Promise from removeChannel
     return () => {
       void supabase.removeChannel(channel);
     };
   }, []);
 
-  const topRow = rooms.filter((r) => r.y === 0);
-  const bottomRow = rooms.filter((r) => r.y === 1);
+  // 2 columns × 3 rows: sort once and render in a 2-col grid
+  const sortedRooms = [...rooms].sort(
+    (a, b) => a.y - b.y || a.x - b.x
+  );
 
   return (
-    <main className="min-h-screen bg-slate-900 text-slate-100 flex flex-col items-center py-10 px-4">
-      <div className="max-w-6xl w-full flex flex-col gap-8">
+    <main className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-950 to-slate-900 text-slate-100 flex items-center justify-center py-12 px-4">
+      <div className="w-full max-w-6xl flex flex-col gap-10">
         <header className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <h1 className="text-3xl font-semibold tracking-tight">
               Cozy Village
             </h1>
             <p className="text-sm text-slate-300">
-              A tiny 2×3 apartment block of LLM villagers quietly living their lives.
+              A tiny 2×3 apartment block of LLM villagers quietly living their
+              lives.
             </p>
           </div>
           <div className="text-xs text-slate-400">
@@ -142,23 +142,29 @@ export default function HomePage() {
           </div>
         </header>
 
-        <section className="grid grid-cols-1 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] gap-6 items-start">
-          <div className="flex gap-4 items-stretch">
-            <div className="flex-1 rounded-3xl bg-slate-800/60 border border-slate-700/70 p-4 shadow-lg">
-              <div className="text-xs uppercase tracking-[0.2em] text-slate-400 mb-3">
-                Apartment block
-              </div>
-              <div className="flex flex-col gap-4">
-                <RowOfRooms rooms={topRow} />
-                <RowOfRooms rooms={bottomRow} />
-              </div>
+        <section className="grid grid-cols-1 lg:grid-cols-[minmax(0,4fr)_minmax(260px,2fr)] gap-12 items-start">
+          {/* Apartment block */}
+          <div className="flex flex-col gap-6 items-center">
+            <div className="text-xs uppercase tracking-[0.25em] text-slate-400">
+              Apartment block
             </div>
 
-            <div className="hidden sm:flex flex-col justify-center">
-              <Ladder />
+            <div className="flex gap-8 items-start">
+              {/* 2 columns × 3 rows */}
+              <div className="grid grid-cols-2 gap-6 w-full">
+                {sortedRooms.map((room) => (
+                  <RoomCard key={room.id} room={room} />
+                ))}
+              </div>
+
+              {/* Ladder on the right */}
+              <div className="hidden md:flex">
+                <Ladder />
+              </div>
             </div>
           </div>
 
+          {/* Village log */}
           <VillageLog
             messages={messages}
             agentById={agentById}
@@ -170,85 +176,16 @@ export default function HomePage() {
   );
 }
 
-function RowOfRooms({ rooms }: { rooms: RoomWithAgent[] }) {
-  return (
-    <div className="grid grid-cols-3 gap-3">
-      {rooms.map((room, idx) => (
-        <div key={room.id} className="relative">
-          <RoomCard room={room} />
-          {idx < rooms.length - 1 && (
-            <div className="absolute right-[-0.55rem] top-1/2 -translate-y-1/2 h-7 w-3 rounded-md border border-slate-700 bg-slate-800/80 shadow-sm" />
-          )}
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function moodLabel(mood: number | null | undefined): string {
-  if (mood == null) return "Unknown";
-  if (mood <= -2) return "Low";
-  if (mood === -1) return "Tired";
-  if (mood === 0) return "Neutral";
-  if (mood === 1) return "Bright";
-  return "Buoyant";
-}
-
-function RoomCard({ room }: { room: RoomWithAgent }) {
-  const agent = room.agent;
-
-  return (
-    <div className="h-28 rounded-2xl border border-slate-700/80 bg-gradient-to-br from-slate-800/80 to-slate-900/90 flex flex-col justify-between p-3 shadow-inner">
-      <div className="flex items-start justify-between gap-2">
-        <div>
-          <div className="text-xs font-semibold text-slate-100">
-            {room.name || "Unnamed room"}
-          </div>
-          {room.theme && (
-            <div className="text-[10px] text-slate-400">
-              {room.theme}
-            </div>
-          )}
-        </div>
-        <div className="text-[9px] text-slate-500">
-          ({room.x},{room.y})
-        </div>
-      </div>
-
-      <div className="mt-2 flex items-end justify-between gap-2">
-        {agent ? (
-          <div className="flex flex-col">
-            <div className="text-sm font-medium text-slate-50">
-              {agent.name}
-            </div>
-            <div className="text-[11px] text-slate-400">
-              {agent.provider} · mood {moodLabel(agent.mood)}
-            </div>
-          </div>
-        ) : (
-          <div className="text-xs text-slate-500 italic">
-            Empty room
-          </div>
-        )}
-
-        <div className="h-8 w-5 rounded-md border border-slate-600 bg-slate-900/80 flex items-end justify-center pb-[2px]">
-          <div className="h-[2px] w-3 rounded-full bg-slate-500/70" />
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function Ladder() {
   return (
-    <div className="relative w-8 h-full max-h-72 rounded-3xl border border-slate-700 bg-slate-900/80 flex flex-col items-center justify-center py-5 shadow-lg">
-      <div className="w-full h-full flex flex-row justify-center gap-4 px-2">
+    <div className="relative w-10 h-64 rounded-3xl border border-slate-800 bg-slate-950/90 flex flex-col items-center justify-center py-5 shadow-xl shadow-black/40">
+      <div className="w-full h-full flex flex-row justify-center gap-4 px-3">
         <div className="w-[3px] h-full rounded-full bg-slate-600" />
         <div className="w-[3px] h-full rounded-full bg-slate-600" />
       </div>
       <div className="pointer-events-none absolute inset-y-6 flex flex-col justify-between items-center">
         {Array.from({ length: 6 }).map((_, i) => (
-          <div key={i} className="w-6 h-[3px] rounded-full bg-slate-500/80" />
+          <div key={i} className="w-7 h-[3px] rounded-full bg-slate-500/90" />
         ))}
       </div>
     </div>
@@ -263,10 +200,10 @@ type VillageLogProps = {
 
 function VillageLog({ messages, agentById, roomById }: VillageLogProps) {
   return (
-    <aside className="rounded-3xl bg-slate-800/60 border border-slate-700/70 p-4 shadow-lg h-[28rem] flex flex-col">
+    <aside className="rounded-3xl bg-slate-950/90 border border-slate-800/80 p-4 shadow-xl shadow-black/40 h-[28rem] flex flex-col">
       <div className="flex items-baseline justify-between mb-3">
         <div>
-          <div className="text-xs uppercase tracking-[0.2em] text-slate-400">
+          <div className="text-xs uppercase tracking-[0.25em] text-slate-400">
             Village log
           </div>
           <p className="text-[11px] text-slate-400">
@@ -290,20 +227,19 @@ function VillageLog({ messages, agentById, roomById }: VillageLogProps) {
           return (
             <div
               key={m.id}
-              className="rounded-xl bg-slate-900/80 border border-slate-700/80 px-3 py-2"
+              className="rounded-2xl bg-slate-900/90 border border-slate-800 px-3 py-2"
             >
               <div className="flex items-center justify-between gap-2">
                 <div className="text-[11px] text-slate-300">
-                  {agent ? agent.name : "Unknown"}{" "}
+                  {agent ? agent.name : "Unknown"}
                   {room && (
                     <span className="text-slate-500">
+                      {" "}
                       · {room.name || "Room"}
                     </span>
                   )}
                 </div>
-                <div className="text-[10px] text-slate-500">
-                  {timeStr}
-                </div>
+                <div className="text-[10px] text-slate-500">{timeStr}</div>
               </div>
               <div className="text-[13px] text-slate-100 mt-[2px]">
                 {m.content}
