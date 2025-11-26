@@ -21,6 +21,8 @@ function formatTime(iso?: string) {
 
 export function ChatPanel() {
   const [messages, setMessages] = useState<SupaMessage[]>([]);
+  const [agentMap, setAgentMap] = useState<Record<string, string>>({});
+  const [selectedAgent, setSelectedAgent] = useState<string>('all');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -49,6 +51,56 @@ export function ChatPanel() {
     };
   }, []);
 
+  // Load agents and keep a simple id->name map so the chat shows names instead of uuids
+  useEffect(() => {
+    let mounted = true;
+    const loadAgents = async () => {
+      const { data, error } = await supabase.from('agents').select('id, name');
+      if (error) {
+        // eslint-disable-next-line no-console
+        console.error('Error loading agents', error);
+        return;
+      }
+
+      if (!mounted || !data) return;
+
+      const map: Record<string, string> = {};
+      for (const a of data as Array<{ id: string; name: string }>) {
+        if (a?.id && a?.name) map[a.id] = a.name;
+      }
+      setAgentMap(map);
+    };
+
+    loadAgents();
+
+    // subscribe to agent changes so names update live
+    const channel = supabase
+      .channel('public:agents')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'agents' },
+        (payload: any) => {
+          const newRow = payload.new as { id: string; name?: string } | null;
+          const oldRow = payload.old as { id: string } | null;
+          if (newRow && newRow.id && newRow.name) {
+            setAgentMap((prev) => ({ ...prev, [newRow.id]: newRow.name as string }));
+          } else if (oldRow && oldRow.id && payload.event === 'DELETE') {
+            setAgentMap((prev) => {
+              const copy = { ...prev };
+              delete copy[oldRow.id];
+              return copy;
+            });
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      mounted = false;
+      void supabase.removeChannel(channel);
+    };
+  }, []);
+
   useEffect(() => {
     const channel = supabase
       .channel('public:messages')
@@ -67,14 +119,40 @@ export function ChatPanel() {
     };
   }, []);
 
+  // Apply agent filter to messages for display
+  const filteredMessages = messages.filter((msg) => {
+    if (selectedAgent === 'all') return true;
+    if (selectedAgent === 'anon') return !msg.from_agent;
+    return msg.from_agent === selectedAgent;
+  });
+
   return (
     <div className="flex flex-col h-full bg-gradient-to-br from-indigo-100 to-purple-100 border-l-8 border-indigo-500">
       {/* Header */}
       <div className="bg-indigo-500 border-b-8 border-indigo-700 p-4 pixel-border-bottom">
         <h2 className="pixel-text text-white text-lg font-bold">CHAT LOG</h2>
-        <p className="pixel-text text-indigo-200 text-xs mt-1">
-          {loading ? 'Connecting…' : `${messages.length} messages`}
-        </p>
+        <div className="flex items-center gap-3 mt-1">
+          <p className="pixel-text text-indigo-200 text-xs">
+            {loading ? 'Connecting…' : `${filteredMessages.length} / ${messages.length} messages`}
+          </p>
+          <div className="ml-auto">
+            <label className="pixel-text text-indigo-100 text-xs mr-2">Filter:</label>
+            <select
+              value={selectedAgent}
+              onChange={(e) => setSelectedAgent(e.target.value)}
+              className="text-xs px-2 py-1 rounded-md bg-indigo-600 text-white border-2 border-indigo-800"
+            >
+              <option value="all">All agents</option>
+              {Object.entries(agentMap)
+                .sort((a, b) => a[1].localeCompare(b[1]))
+                .map(([id, name]) => (
+                  <option key={id} value={id}>
+                    {name}
+                  </option>
+                ))}
+            </select>
+          </div>
+        </div>
       </div>
 
       {/* Messages */}
@@ -83,8 +161,11 @@ export function ChatPanel() {
           <div className="text-xs text-gray-500">No messages yet.</div>
         )}
 
-        {messages.map((msg) => {
-          const username = msg.from_agent || 'Anon';
+  {filteredMessages.map((msg) => {
+          // If from_agent is an id that exists in our agentMap, use the agent name.
+          // Otherwise, fall back to the value in the message (in case it's already a name) or 'Anon'.
+          const raw = msg.from_agent || '';
+          const username = (raw && agentMap[raw]) || raw || 'Anon';
           const avatar = username ? username[0] : '🙂';
           const time = formatTime(msg.ts);
           // pick a color deterministically from username
