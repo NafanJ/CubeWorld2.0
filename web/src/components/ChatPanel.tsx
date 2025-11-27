@@ -48,9 +48,39 @@ export function ChatPanel() {
   const [agentColorMap, setAgentColorMap] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement | null>(null);
+  const isAtBottomRef = useRef<boolean>(true);
+  const initialLoadRef = useRef<boolean>(true);
+  const messagesRef = useRef<SupaMessage[]>([]);
+  const hasScrolledRef = useRef<boolean>(false);
+  const [newMessageCount, setNewMessageCount] = useState(0);
+
+  const scrollToBottom = useCallback((behavior: ScrollBehavior = 'auto') => {
+    const el = messagesContainerRef.current;
+    if (el) {
+      el.scrollTo({ top: el.scrollHeight, behavior });
+    } else {
+      messagesEndRef.current?.scrollIntoView({ behavior });
+    }
+  }, []);
+
+  const handleScroll = useCallback(() => {
+    const el = messagesContainerRef.current;
+    if (!el) return;
+    const distanceFromBottom = el.scrollHeight - (el.scrollTop + el.clientHeight);
+    // consider "near bottom" within 120px
+    const atBottom = distanceFromBottom <= 120;
+    isAtBottomRef.current = atBottom;
+  // mark that the user has scrolled if they are not at the bottom (covers top and any scroll away from bottom)
+  hasScrolledRef.current = !atBottom;
+    if (atBottom) {
+      setNewMessageCount(0);
+      hasScrolledRef.current = false;
+    }
+  }, []);
 
   // Helper function to reload messages from the database
-  const loadMessages = useCallback(async () => {
+  const loadMessages = useCallback(async (): Promise<SupaMessage[] | null> => {
     const { data, error } = await supabase
       .from('messages')
       .select('id, content, from_agent, ts')
@@ -60,12 +90,15 @@ export function ChatPanel() {
     if (error) {
       // eslint-disable-next-line no-console
       console.error('Error reloading messages', error);
-      return;
+      return null;
     }
 
     if (data) {
-      setMessages((data as SupaMessage[]).reverse());
+      const ordered = (data as SupaMessage[]).reverse();
+      setMessages(ordered);
+      return ordered;
     }
+    return null;
   }, []);
 
   useEffect(() => {
@@ -156,11 +189,31 @@ export function ChatPanel() {
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'messages' },
-        () => {
+        async () => {
           // eslint-disable-next-line no-console
           console.log('[ChatPanel] New message detected, reloading...');
-          // Reload all messages from the database to stay in sync
-          loadMessages();
+          const prevLen = messagesRef.current.length;
+          const newData = await loadMessages();
+          if (newData) {
+            const added = newData.length - prevLen;
+            if (added > 0) {
+              // Check current scroll position at time of arrival to avoid relying solely on scroll handler
+              const el = messagesContainerRef.current;
+              let atBottom = isAtBottomRef.current;
+              if (el) {
+                const distanceFromBottom = el.scrollHeight - (el.scrollTop + el.clientHeight);
+                atBottom = distanceFromBottom <= 120;
+                isAtBottomRef.current = atBottom;
+              }
+
+              // show indicator if the user has scrolled at all (even a little)
+              if (hasScrolledRef.current || !atBottom) {
+                setNewMessageCount((c) => c + added);
+              } else {
+                setNewMessageCount(0);
+              }
+            }
+          }
         }
       )
       .on('system', {}, (msg: any) => {
@@ -186,17 +239,44 @@ export function ChatPanel() {
     return msg.from_agent === selectedAgent;
   });
 
-  // Auto-scroll to bottom when messages first load
+  // Smart auto-scroll:
+  // - on initial load, jump to bottom
+  // - on subsequent message changes, only auto-scroll if user is near the bottom
   useEffect(() => {
-    if (messages.length > 0) {
+    if (messages.length === 0) return;
+
+    if (initialLoadRef.current) {
+      // defer until after render
       setTimeout(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
+        scrollToBottom('auto');
+        initialLoadRef.current = false;
       }, 0);
+      return;
     }
-  }, [messages.length]);
+
+    if (isAtBottomRef.current) {
+      // smooth scroll for new messages when user is at bottom
+      setTimeout(() => scrollToBottom('smooth'), 0);
+    }
+  }, [messages.length, scrollToBottom]);
+
+  // attach scroll listener to messages container
+  useEffect(() => {
+    const el = messagesContainerRef.current;
+    if (!el) return;
+    el.addEventListener('scroll', handleScroll, { passive: true });
+    // initialize position
+    handleScroll();
+    return () => void el.removeEventListener('scroll', handleScroll);
+  }, [handleScroll]);
+
+  // keep a ref copy of messages for use inside subscription handlers
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
 
   return (
-    <div className="flex flex-col h-full bg-gradient-to-br from-indigo-100 to-purple-100 border-l-8 border-indigo-500">
+    <div className="relative flex flex-col h-full bg-gradient-to-br from-indigo-100 to-purple-100 border-l-8 border-indigo-500">
       {/* Header */}
       <div className="bg-indigo-500 border-b-8 border-indigo-700 p-4 pixel-border-bottom">
         <h2 className="pixel-text text-white text-lg font-bold">CHAT LOG</h2>
@@ -224,8 +304,8 @@ export function ChatPanel() {
         </div>
       </div>
 
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-2">
+  {/* Messages */}
+  <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-4 space-y-2">
         {messages.length === 0 && !loading && (
           <div className="text-xs text-gray-500">No messages yet.</div>
         )}
@@ -258,6 +338,29 @@ export function ChatPanel() {
         })}
         <div ref={messagesEndRef} />
       </div>
+
+      {/* New-message indicator (fixed inside panel so position is stable) */}
+      {newMessageCount > 0 && (
+        <div className="absolute bottom-20 right-6 z-50 flex items-center">
+          <div className="relative">
+            {/* animated ping dot */}
+            <span className="absolute -top-2 -right-3 inline-flex">
+              <span className="animate-ping absolute inline-flex h-3 w-3 rounded-full bg-indigo-400 opacity-60"></span>
+              <span className="relative inline-flex h-3 w-3 rounded-full bg-indigo-600 border border-white"></span>
+            </span>
+            <button
+              onClick={() => {
+                scrollToBottom('smooth');
+                setNewMessageCount(0);
+              }}
+              className="bg-indigo-600 text-white px-3 py-1 rounded-full text-sm shadow-lg border-2 border-indigo-800 flex items-center gap-2"
+            >
+              <span className="font-bold">{newMessageCount}</span>
+              <span className="text-[11px]">new</span>
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Input (UI only) */}
       <div className="p-4 bg-white border-t-8 border-indigo-500">
