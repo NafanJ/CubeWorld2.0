@@ -68,7 +68,9 @@ create policy "read_all" on diary_entries for select using (true);
 create policy "read_all" on relationships for select using (true);
 create policy "read_all" on world_state for select using (true);
 
-create policy "no_client_inserts" on messages for insert with check (false);
+-- Enable Realtime for specific tables
+alter publication supabase_realtime add table messages;
+alter publication supabase_realtime add table agents;
 create policy "no_client_inserts" on diary_entries for insert with check (false);
 create policy "no_client_updates_agents" on agents for update with check (false);
 create policy "no_client_updates_world" on world_state for update with check (false);
