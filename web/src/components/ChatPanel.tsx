@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { ChatMessage } from './ChatMessage';
 import { SendIcon } from 'lucide-react';
 import { supabase } from '../lib/supabase';
@@ -48,30 +48,32 @@ export function ChatPanel() {
   const [agentColorMap, setAgentColorMap] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
 
+  // Helper function to reload messages from the database
+  const loadMessages = useCallback(async () => {
+    const { data, error } = await supabase
+      .from('messages')
+      .select('id, content, from_agent, ts')
+      .order('ts', { ascending: false })
+      .limit(50);
+
+    if (error) {
+      // eslint-disable-next-line no-console
+      console.error('Error reloading messages', error);
+      return;
+    }
+
+    if (data) {
+      setMessages((data as SupaMessage[]).reverse());
+    }
+  }, []);
 
   useEffect(() => {
-    let mounted = true;
-    const load = async () => {
-      setLoading(true);
-      const { data, error } = await supabase
-        .from('messages')
-        .select('id, content, from_agent, ts')
-        .order('ts', { ascending: false })
-        .limit(50);
-
-      if (error) {
-        // eslint-disable-next-line no-console
-        console.error('Error loading messages', error);
-      } else if (mounted && data) {
-        setMessages((data as SupaMessage[]).reverse());
-      }
-      setLoading(false);
-    };
-
-    load();
+    setLoading(true);
+    loadMessages();
+    setLoading(false);
 
     return () => {
-      mounted = false;
+      // cleanup
     };
   }, []);
 
@@ -153,17 +155,28 @@ export function ChatPanel() {
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'messages' },
-        (payload: any) => {
-          const m = payload.new as SupaMessage;
-          setMessages((prev) => [...prev, m].slice(-100));
+        () => {
+          // eslint-disable-next-line no-console
+          console.log('[ChatPanel] New message detected, reloading...');
+          // Reload all messages from the database to stay in sync
+          loadMessages();
         }
       )
-      .subscribe();
+      .on('system', {}, (msg: any) => {
+        if (msg.event === 'SUBSCRIBED') {
+          // eslint-disable-next-line no-console
+          console.log('[ChatPanel] Subscribed to messages channel');
+        }
+      })
+      .subscribe((status: any) => {
+        // eslint-disable-next-line no-console
+        console.log('[ChatPanel] Subscription status:', status);
+      });
 
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, []);
+  }, [loadMessages]);
 
   // Apply agent filter to messages for display
   const filteredMessages = messages.filter((msg) => {
