@@ -25,8 +25,8 @@ export function RoomCard({
   };
   return <div className="w-full aspect-video">
       <div 
-        className={`${!backgroundImage ? roomBgs[color as keyof typeof roomBgs] : ''} w-full h-full relative overflow-hidden pixel-room`}
-        style={backgroundImage ? { backgroundImage: `url(${backgroundImage})`, backgroundSize: '100% 100%', backgroundRepeat: 'no-repeat', backgroundPosition: 'center' } : undefined}
+        className={`${!backgroundImage ? roomBgs[color as keyof typeof roomBgs] : ''} w-full h-full relative overflow-hidden pixel-room bg-cover bg-center`}
+        style={backgroundImage ? { backgroundImage: `url(${backgroundImage})`, backgroundSize: 'cover', backgroundRepeat: 'no-repeat', backgroundPosition: 'center' } : undefined}
       >
         {/* Animated Character Sprite */}
         <div className="character-walk absolute bottom-6" style={{

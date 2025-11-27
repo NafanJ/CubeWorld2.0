@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { ChatMessage } from './ChatMessage';
 import { SendIcon } from 'lucide-react';
 import { supabase } from '../lib/supabase';
@@ -47,6 +47,7 @@ export function ChatPanel() {
   const [selectedAgent, setSelectedAgent] = useState<string>('all');
   const [agentColorMap, setAgentColorMap] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Helper function to reload messages from the database
   const loadMessages = useCallback(async () => {
@@ -185,6 +186,15 @@ export function ChatPanel() {
     return msg.from_agent === selectedAgent;
   });
 
+  // Auto-scroll to bottom when messages first load
+  useEffect(() => {
+    if (messages.length > 0) {
+      setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
+      }, 0);
+    }
+  }, [messages.length]);
+
   return (
     <div className="flex flex-col h-full bg-gradient-to-br from-indigo-100 to-purple-100 border-l-8 border-indigo-500">
       {/* Header */}
@@ -220,7 +230,7 @@ export function ChatPanel() {
           <div className="text-xs text-gray-500">No messages yet.</div>
         )}
 
-  {filteredMessages.map((msg) => {
+        {filteredMessages.map((msg) => {
           // If from_agent is an id that exists in our agentMap, use the agent name.
           // Otherwise, fall back to the value in the message (in case it's already a name) or 'Anon'.
           const raw = msg.from_agent || '';
@@ -246,6 +256,7 @@ export function ChatPanel() {
             />
           );
         })}
+        <div ref={messagesEndRef} />
       </div>
 
       {/* Input (UI only) */}
