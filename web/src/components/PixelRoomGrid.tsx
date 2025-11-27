@@ -94,7 +94,7 @@ export const PixelRoomGrid: React.FC = () => {
 
   return (
     <>
-      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 max-w-5xl w-full auto-rows-fr">
+      <div className="grid grid-cols-2 gap-3 max-w-5xl w-full auto-rows-fr">
         {rooms.map((room, index) => (
           <RoomCard
             key={index}
