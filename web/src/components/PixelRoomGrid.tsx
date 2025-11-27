@@ -15,32 +15,32 @@ const initialRooms: Room[] = [{
   color: 'red',
   character: '/sprites/homer.png',
   status: 'online',
-  backgroundImage: '/rooms/room1.png'
+  backgroundImage: '/rooms/Room1_nochar.png'
 }, {
   color: 'orange',
   character: '/sprites/homer.png',
   status: 'online',
-  backgroundImage: '/rooms/room1.png'
+  backgroundImage: '/rooms/Room1_nochar.png'
 }, {
   color: 'green',
   character: '/sprites/homer.png',
   status: 'online',
-  backgroundImage: '/rooms/room1.png'
+  backgroundImage: '/rooms/Room1_nochar.png'
 }, {
   color: 'blue',
   character: '/sprites/homer.png',
   status: 'online',
-  backgroundImage: '/rooms/room1.png'
+  backgroundImage: '/rooms/Room1_nochar.png'
 }, {
   color: 'purple',
   character: '/sprites/homer.png',
   status: 'online',
-  backgroundImage: '/rooms/room1.png'
+  backgroundImage: '/rooms/Room1_nochar.png'
 }, {
   color: 'teal',
   character: '/sprites/homer.png',
   status: 'online',
-  backgroundImage: '/rooms/room1.png'
+  backgroundImage: '/rooms/Room1_nochar.png'
 }];
 
 export const PixelRoomGrid: React.FC = () => {
