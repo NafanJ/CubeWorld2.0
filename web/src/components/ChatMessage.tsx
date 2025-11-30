@@ -45,15 +45,15 @@ export function ChatMessage({
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-baseline gap-2 mb-1">
-          <span className="pixel-text text-sm font-bold text-gray-900">
+          <span className="pixel-text text-xs lg:text-sm font-bold text-gray-900">
             {username}
           </span>
-          <span className="pixel-text text-[10px] text-gray-500">
+          <span className="pixel-text text-[8px] lg:text-[10px] text-gray-500">
             {timestamp}
           </span>
         </div>
         <div className={`${allColorClasses[color as keyof typeof allColorClasses]} border-4 rounded-lg px-3 py-2 pixel-border-sm`}>
-          <p className="pixel-text text-sm text-gray-900">{message}</p>
+          <p className="pixel-text text-xs lg:text-sm text-gray-900">{message}</p>
         </div>
       </div>
     </div>;

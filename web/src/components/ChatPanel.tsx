@@ -278,7 +278,7 @@ export function ChatPanel() {
     <div className="relative flex flex-col h-full bg-gradient-to-br from-indigo-100 to-purple-100 border-l-8 border-indigo-500">
       {/* Header */}
       <div className="bg-indigo-500 border-b-8 border-indigo-700 p-4 pixel-border-bottom">
-        <h2 className="pixel-text text-white text-lg font-bold">CHAT LOG</h2>
+        <h2 className="pixel-text text-white text-lg lg:text-lg font-bold text-sm">CHAT LOG</h2>
         <div className="flex items-center gap-3 mt-1">
           <p className="pixel-text text-indigo-200 text-xs">
             {loading ? 'Connecting…' : `${filteredMessages.length} / ${messages.length} messages`}
