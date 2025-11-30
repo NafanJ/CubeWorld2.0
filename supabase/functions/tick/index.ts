@@ -322,6 +322,34 @@ serve(async (req) => {
       inserted += 1;
     }
 
+    // After generating messages, randomly move some agents to neighboring rooms occasionally
+    // Build a list of room ids to pick from
+    const roomIds = Array.from(roomsMap.keys());
+    for (const agent of agents) {
+      try {
+        // 10% chance to move this tick
+        if (Math.random() > 0.9) continue;
+
+        const current = agent.room_id;
+        // pick a different room at random
+        const candidates = roomIds.filter((r) => r !== current);
+        if (candidates.length === 0) continue;
+        const newRoom = candidates[Math.floor(Math.random() * candidates.length)];
+
+        const { error: uErr } = await supabase
+          .from('agents')
+          .update({ room_id: newRoom })
+          .eq('id', agent.id);
+
+        if (uErr) {
+          console.error('Error moving agent', agent.id, uErr);
+          continue;
+        }
+      } catch (moveErr) {
+        console.error('Error in moving agents:', moveErr);
+      }
+    }
+
     return new Response(
       JSON.stringify({ ok: true, inserted, quiet: quietCount }),
       { headers: { "Content-Type": "application/json" } }

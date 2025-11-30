@@ -1,107 +1,90 @@
-import React, { useEffect, useState } from 'react'; // React is used for JSX
+import React, { useEffect, useState } from 'react';
 import { RoomCard } from './RoomCard';
 import { supabase } from '../lib/supabase';
 
-interface Room {
-  color: string;
-  character: string;
+interface RoomUI {
+  id: string;
+  roomName: string;
   status: string;
-  backgroundImage: string;
-  username?: string; // Optional username property
-  roomName?: string;
+  backgroundImage?: string;
+  characters: string[]; // avatars (initials)
+  usernames: string[];
 }
 
-const initialRooms: Room[] = [{
-  color: 'red',
-  character: '/sprites/homer.png',
-  status: 'online',
-  backgroundImage: '/rooms/Room1_nochar.png'
-}, {
-  color: 'orange',
-  character: '/sprites/homer.png',
-  status: 'online',
-  backgroundImage: '/rooms/Room1_nochar.png'
-}, {
-  color: 'green',
-  character: '/sprites/homer.png',
-  status: 'online',
-  backgroundImage: '/rooms/Room1_nochar.png'
-}, {
-  color: 'blue',
-  character: '/sprites/homer.png',
-  status: 'online',
-  backgroundImage: '/rooms/Room1_nochar.png'
-}, {
-  color: 'purple',
-  character: '/sprites/homer.png',
-  status: 'online',
-  backgroundImage: '/rooms/Room1_nochar.png'
-}, {
-  color: 'teal',
-  character: '/sprites/homer.png',
-  status: 'online',
-  backgroundImage: '/rooms/Room1_nochar.png'
-}];
-
 export const PixelRoomGrid: React.FC = () => {
-  const [rooms, setRooms] = useState<Room[]>(initialRooms);
+  const [rooms, setRooms] = useState<RoomUI[]>([]);
 
   useEffect(() => {
-    const fetchUsernames = async () => {
-      const { data, error } = await supabase
-        .from('agents')
-        .select('name');
-
-      if (error) {
-        console.error('Error fetching usernames:', error);
+    const load = async () => {
+      const { data: roomsData, error: rErr } = await supabase.from('rooms').select('id, name, theme');
+      if (rErr) {
+        console.error('Error loading rooms', rErr);
         return;
       }
 
-      const names = (data as Array<{ name?: string }> | null)?.map((a) => a?.name || '') || [];
-
-      setRooms((prevRooms) =>
-        prevRooms.map((room, index) => ({
-          ...room,
-          username: names[index] || room.username || `Agent ${index + 1}`,
-        }))
-      );
-    };
-
-    fetchUsernames();
-  }, []);
-
-  // Fetch room names and attach them to rooms (top-left label)
-  useEffect(() => {
-    const fetchRoomNames = async () => {
-      const { data, error } = await supabase.from('rooms').select('name');
-      if (error) {
-        console.error('Error fetching room names:', error);
+      const { data: agentsData, error: aErr } = await supabase.from('agents').select('id, name, room_id');
+      if (aErr) {
+        console.error('Error loading agents', aErr);
         return;
       }
 
-      const names = (data as Array<{ name?: string }> | null)?.map((r) => r?.name || '') || [];
+      const agents = (agentsData ?? []) as Array<{ id: string; name?: string; room_id?: string | null }>;
+      const roomsArr = (roomsData ?? []) as Array<{ id: string; name?: string; theme?: string }>;
 
-      setRooms((prevRooms) =>
-        prevRooms.map((room, index) => ({
-          ...room,
-          roomName: names[index] || room.roomName || `Room ${index + 1}`,
-        }))
-      );
+      const uiRooms: RoomUI[] = roomsArr.map((r, idx) => {
+        const inRoom = agents.filter((ag) => ag.room_id === r.id);
+        const chars = inRoom.map((ag) => (ag.name ? ag.name.charAt(0) : '🙂'));
+        const usernames = inRoom.map((ag) => ag.name || 'Anon');
+        // use themed background or fallback to static images by index
+        const bg = `/rooms/Room1_nochar.png`;
+        return {
+          id: r.id,
+          roomName: r.name || `Room ${idx + 1}`,
+          status: 'online',
+          backgroundImage: bg,
+          characters: chars,
+          usernames
+        };
+      });
+
+      setRooms(uiRooms);
     };
 
-    fetchRoomNames();
+    load();
+    // subscribe to agents/rooms changes so UI updates when agents move
+    const channel = supabase
+      .channel('public:agents-rooms')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'agents' },
+        () => {
+          void load();
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'rooms' },
+        () => {
+          void load();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
   }, []);
 
   return (
     <>
       <div className="grid grid-cols-2 gap-3 max-w-5xl w-full auto-rows-fr">
-        {rooms.map((room, index) => (
+        {rooms.map((room) => (
           <RoomCard
-            key={index}
-            color={room.color}
-            character={room.character}
-            username={room.username || 'Guest'}
-            roomName={room.roomName || `Room ${index + 1}`}
+            key={room.id}
+            color="teal"
+            characters={room.characters}
+            usernames={room.usernames}
+            roomName={room.roomName}
             status={room.status}
             backgroundImage={room.backgroundImage}
           />

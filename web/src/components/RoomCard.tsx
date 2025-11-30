@@ -1,16 +1,16 @@
 import React from 'react';
 interface RoomCardProps {
   color: string;
-  character: string;
-  username: string;
+  characters?: string[]; // one-char avatars or image urls
+  usernames?: string[]; // names of agents in the room
   roomName?: string;
   status: string;
   backgroundImage?: string;
 }
 export function RoomCard({
   color,
-  character,
-  username,
+  characters = [],
+  usernames = [],
   roomName,
   status,
   backgroundImage
@@ -28,21 +28,18 @@ export function RoomCard({
         className={`${!backgroundImage ? roomBgs[color as keyof typeof roomBgs] : ''} w-full h-full relative overflow-hidden pixel-room bg-cover bg-center`}
         style={backgroundImage ? { backgroundImage: `url(${backgroundImage})`, backgroundSize: 'cover', backgroundRepeat: 'no-repeat', backgroundPosition: 'center' } : undefined}
       >
-        {/* Animated Character Sprite */}
-        <div className="character-walk absolute bottom-6" style={{
-        animationDelay: `${Math.random() * 3}s`
-      }}>
-          <img 
-            src={character} 
-            alt="character sprite" 
-            className="pixel-character sprite-walking"
-            style={{
-              width: '48px',
-              height: '48px',
-              imageRendering: 'pixelated',
-              display: 'block'
-            }}
-          />
+        {/* Characters (multiple avatars) */}
+        <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex items-end gap-2">
+          {characters.length === 0 && (
+            <div className="w-10 h-10 rounded-lg border-4 flex items-center justify-center text-xl">
+              🙋
+            </div>
+          )}
+          {characters.map((c, i) => (
+            <div key={i} className={`w-9 h-9 rounded-full border-2 bg-white flex items-center justify-center text-sm ${i > 0 ? '-ml-2' : ''}`} title={usernames[i] || ''}>
+              {c}
+            </div>
+          ))}
         </div>
 
         {/* Room name label (top-left) */}
@@ -52,9 +49,9 @@ export function RoomCard({
           </div>
         )}
 
-        {/* Username label (bottom-left) */}
+        {/* Username label (bottom-left) - show first username if present */}
         <div className="absolute bottom-2 left-2 bg-black bg-opacity-70 px-2 py-1 rounded border border-white">
-          <p className="text-white text-[8px] pixel-text">{username}</p>
+          <p className="text-white text-[8px] pixel-text">{usernames[0] || 'Guest'}</p>
         </div>
 
         {/* Status indicator */}
