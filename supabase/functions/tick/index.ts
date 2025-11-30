@@ -174,7 +174,7 @@ async function generateMessage(
   const recentLines = history
     .map((m) => m.content?.trim())
     .filter((c): c is string => !!c)
-    .slice(0, 10);
+    .slice(0, 20);
 
   const recentHistoryText =
     recentLines.length > 0
