@@ -30,11 +30,6 @@ export function RoomCard({
       >
         {/* Characters (multiple avatars) */}
         <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex items-end gap-2">
-          {characters.length === 0 && (
-            <div className="w-10 h-10 rounded-lg border-4 flex items-center justify-center text-xl">
-              🙋
-            </div>
-          )}
           {characters.map((c, i) => (
             <div key={i} className={`w-9 h-9 rounded-full border-2 bg-white flex items-center justify-center text-sm ${i > 0 ? '-ml-2' : ''}`} title={usernames[i] || ''}>
               {c}
