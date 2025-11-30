@@ -292,8 +292,65 @@ serve(async (req) => {
     let inserted = 0;
     let quietCount = 0;
 
+    // Track which agents moved this tick
+    const movedAgents = new Set<string>();
+
+    // Phase 1: Move agents first, before generating messages
+    // Build a list of room ids to pick from
+    const roomIds = Array.from(roomsMap.keys());
     for (const agent of agents) {
+      try {
+        // 15% chance to move this tick
+        if (Math.random() > 0.15) continue;
+
+        const current = agent.room_id;
+        // pick a different room at random
+        const candidates = roomIds.filter((r) => r !== current);
+        if (candidates.length === 0) continue;
+        const newRoom = candidates[Math.floor(Math.random() * candidates.length)];
+
+        const { error: uErr } = await supabase
+          .from('agents')
+          .update({ room_id: newRoom })
+          .eq('id', agent.id);
+
+        if (uErr) {
+          console.error('Error moving agent', agent.id, uErr);
+          continue;
+        }
+
+        // Mark this agent as moved
+        movedAgents.add(agent.id);
+
+        // Insert a movement message
+        const newRoomName = roomsMap.get(newRoom)?.name || `room ${newRoom.substring(0, 8)}`;
+        const { error: msgErr } = await supabase.from("messages").insert({
+          from_agent: agent.id,
+          room_id: newRoom,
+          content: `${agent.name} moves to ${newRoomName}`
+          // ts defaults to now()
+          // mood_tag left null for now
+        });
+
+        if (msgErr) {
+          console.error('Error inserting movement message:', msgErr);
+          continue;
+        }
+
+        inserted += 1;
+      } catch (moveErr) {
+        console.error('Error in moving agents:', moveErr);
+      }
+    }
+
+    // Phase 2: Generate messages for agents that didn't move
+    // Refresh agents to get updated room_id values after moves
+    const refreshedAgents = await getAgents();
+    for (const agent of refreshedAgents) {
       if (!agent.room_id) continue;
+
+      // Skip agents that moved this tick
+      if (movedAgents.has(agent.id)) continue;
 
       const history = historyByAgent.get(agent.id) ?? [];
       const room = roomsMap.get(agent.room_id) as Room | undefined;
@@ -320,34 +377,6 @@ serve(async (req) => {
       }
 
       inserted += 1;
-    }
-
-    // After generating messages, randomly move some agents to neighboring rooms occasionally
-    // Build a list of room ids to pick from
-    const roomIds = Array.from(roomsMap.keys());
-    for (const agent of agents) {
-      try {
-        // 10% chance to move this tick
-        if (Math.random() > 0.9) continue;
-
-        const current = agent.room_id;
-        // pick a different room at random
-        const candidates = roomIds.filter((r) => r !== current);
-        if (candidates.length === 0) continue;
-        const newRoom = candidates[Math.floor(Math.random() * candidates.length)];
-
-        const { error: uErr } = await supabase
-          .from('agents')
-          .update({ room_id: newRoom })
-          .eq('id', agent.id);
-
-        if (uErr) {
-          console.error('Error moving agent', agent.id, uErr);
-          continue;
-        }
-      } catch (moveErr) {
-        console.error('Error in moving agents:', moveErr);
-      }
     }
 
     return new Response(
