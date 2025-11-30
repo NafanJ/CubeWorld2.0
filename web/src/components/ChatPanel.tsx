@@ -40,12 +40,38 @@ function formatTime(iso?: string) {
   }
 }
 
+// Get the date portion (YYYY-MM-DD) from an ISO timestamp
+function getDateKey(iso: string): string {
+  try {
+    return iso.split('T')[0];
+  } catch {
+    return '';
+  }
+}
+
+// Format a date key (YYYY-MM-DD) for display as "Thursday, Jan 18"
+function formatDateHeader(dateKey: string): string {
+  try {
+    const date = new Date(dateKey + 'T00:00:00Z');
+    return date.toLocaleDateString('en-US', { 
+      weekday: 'long', 
+      month: 'short', 
+      day: 'numeric' 
+    });
+  } catch {
+    return dateKey;
+  }
+}
+
 export function ChatPanel() {
   const [messages, setMessages] = useState<SupaMessage[]>([]);
   const [agentMap, setAgentMap] = useState<Record<string, string>>({});
   const [selectedAgent, setSelectedAgent] = useState<string>('all');
   const [agentColorMap, setAgentColorMap] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
+  const [selectedDate, setSelectedDate] = useState<string>(''); // YYYY-MM-DD format, empty = today
+  const [availableDates, setAvailableDates] = useState<string[]>([]); // sorted descending
+  const [dayMessageCounts, setDayMessageCounts] = useState<Record<string, number>>({}); // count per day
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement | null>(null);
   const isAtBottomRef = useRef<boolean>(true);
@@ -83,8 +109,7 @@ export function ChatPanel() {
     const { data, error } = await supabase
       .from('messages')
       .select('id, content, from_agent, ts')
-      .order('ts', { ascending: false })
-      .limit(50);
+      .order('ts', { ascending: false });
 
     if (error) {
       // eslint-disable-next-line no-console
@@ -95,6 +120,25 @@ export function ChatPanel() {
     if (data) {
       const ordered = (data as SupaMessage[]).reverse();
       setMessages(ordered);
+      
+      // Build date information
+      const dateToCount: Record<string, number> = {};
+      for (const msg of ordered) {
+        const dateKey = getDateKey(msg.ts);
+        if (dateKey) {
+          dateToCount[dateKey] = (dateToCount[dateKey] || 0) + 1;
+        }
+      }
+      
+      const dates = Object.keys(dateToCount).sort().reverse(); // descending order (newest first)
+      setAvailableDates(dates);
+      setDayMessageCounts(dateToCount);
+      
+      // Set initial selected date to today if not already set
+      if (!selectedDate && dates.length > 0) {
+        setSelectedDate(dates[0]);
+      }
+      
       return ordered;
     }
     return null;
@@ -231,12 +275,43 @@ export function ChatPanel() {
     };
   }, [loadMessages]);
 
-  // Apply agent filter to messages for display
+  // Apply agent and date filter to messages for display
   const filteredMessages = messages.filter((msg) => {
+    // Filter by selected date
+    const msgDate = getDateKey(msg.ts);
+    if (msgDate !== selectedDate) return false;
+    
+    // Filter by agent
     if (selectedAgent === 'all') return true;
     if (selectedAgent === 'anon') return !msg.from_agent;
     return msg.from_agent === selectedAgent;
   });
+
+  // Helper to navigate to previous day
+  const goToPreviousDay = useCallback(() => {
+    const idx = availableDates.indexOf(selectedDate);
+    if (idx < availableDates.length - 1) {
+      setSelectedDate(availableDates[idx + 1]);
+      initialLoadRef.current = true;
+    }
+  }, [availableDates, selectedDate]);
+
+  // Helper to navigate to next day (more recent)
+  const goToNextDay = useCallback(() => {
+    const idx = availableDates.indexOf(selectedDate);
+    if (idx > 0) {
+      setSelectedDate(availableDates[idx - 1]);
+      initialLoadRef.current = true;
+    }
+  }, [availableDates, selectedDate]);
+
+  // Helper to jump to today
+  const goToToday = useCallback(() => {
+    if (availableDates.length > 0) {
+      setSelectedDate(availableDates[0]);
+      initialLoadRef.current = true;
+    }
+  }, [availableDates]);
 
   // Smart auto-scroll:
   // - on initial load, jump to bottom
@@ -274,12 +349,57 @@ export function ChatPanel() {
     messagesRef.current = messages;
   }, [messages]);
 
+  const isToday = availableDates.length > 0 && selectedDate === availableDates[0];
+  const canGoBack = availableDates.length > 0 && selectedDate !== availableDates[availableDates.length - 1];
+  const canGoForward = availableDates.length > 0 && selectedDate !== availableDates[0];
+
   return (
     <div className="relative flex flex-col h-full bg-gradient-to-br from-indigo-100 to-purple-100 border-l-8 border-indigo-500">
       {/* Header */}
       <div className="bg-indigo-500 border-b-8 border-indigo-700 p-4 pixel-border-bottom">
         <h2 className="pixel-text text-white text-lg lg:text-lg font-bold text-sm">CHAT LOG</h2>
-        <div className="flex items-center gap-3 mt-1">
+        
+        {/* Date Badge */}
+        {selectedDate && (
+          <div className="mt-2 mb-2 inline-block bg-indigo-700 text-indigo-100 px-3 py-1 rounded-md border-2 border-indigo-800 pixel-text text-xs">
+            Viewing: {formatDateHeader(selectedDate)}
+          </div>
+        )}
+        
+        <div className="flex items-center gap-3 mt-2">
+          {/* Day Navigation */}
+          <div className="flex items-center gap-1">
+            <button
+              onClick={goToPreviousDay}
+              disabled={!canGoBack}
+              className="px-2 py-1 bg-indigo-600 text-white border-2 border-indigo-800 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-indigo-700 text-xs"
+              title="View previous day"
+            >
+              ← Prev
+            </button>
+            <button
+              onClick={goToToday}
+              disabled={isToday}
+              className="px-2 py-1 bg-indigo-600 text-white border-2 border-indigo-800 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-indigo-700 text-xs"
+              title="Jump to today"
+            >
+              Today
+            </button>
+            <button
+              onClick={goToNextDay}
+              disabled={!canGoForward}
+              className="px-2 py-1 bg-indigo-600 text-white border-2 border-indigo-800 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-indigo-700 text-xs"
+              title="View next day"
+            >
+              Next →
+            </button>
+            {selectedDate && dayMessageCounts[selectedDate] !== undefined && (
+              <span className="pixel-text text-indigo-200 text-xs ml-2">
+                ({dayMessageCounts[selectedDate]} message{dayMessageCounts[selectedDate] === 1 ? '' : 's'})
+              </span>
+            )}
+          </div>
+
           <p className="pixel-text text-indigo-200 text-xs">
             {loading ? 'Connecting…' : `${filteredMessages.length} / ${messages.length} messages`}
           </p>
@@ -307,6 +427,10 @@ export function ChatPanel() {
   <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-4 space-y-2 border-b-8 border-indigo-500">
         {messages.length === 0 && !loading && (
           <div className="text-xs text-gray-500">No messages yet.</div>
+        )}
+
+        {messages.length > 0 && filteredMessages.length === 0 && (
+          <div className="text-xs text-gray-500">No messages on this day.</div>
         )}
 
         {filteredMessages.map((msg) => {
