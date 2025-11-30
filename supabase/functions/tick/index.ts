@@ -204,28 +204,24 @@ ${recentHistoryText}
 
 Now decide what to do this tick:
 
-- Most of the time you will choose to describe a tiny new action.
-- Occasionally, if it feels right, you can choose to stay quiet and not add a new log entry.
+- Choose to describe a tiny new action.
 
-If you choose to stay quiet, reply with exactly the single word:
-QUIET
-
-If you choose to describe a new action, reply with ONE new short, present-tense line (max ~80 characters)
+Reply with ONE new short, present-tense line (max ~80 characters)
 describing what you are doing right now in this room.
 
 Keep it gentle, slice-of-life, and grounded.
 ${varietyInstructions}
 No emojis, no dialogue. Always write in third person perspective.
-Reply with either exactly "QUIET" or the one line. Nothing else.
+Reply with the one line. Nothing else.
 `;
 
-  async function callOnce(): Promise<"QUIET" | string | null> {
+  async function callOnce(): Promise<string | null> {
     const response = await openai.chat.completions.create({
       model: "gpt-4.1-mini",
       messages: [
         {
           role: "system",
-          content: `You are ${agent.name} with these traits: ${traits.join(", ") || "versatile"}. Generate one unique, grounded action or reply QUIET. Be varied and avoid repetition.`
+          content: `You are ${agent.name} with these traits: ${traits.join(", ") || "versatile"}. Generate one unique, grounded action. Be varied and avoid repetition.`
         },
         { role: "user", content: prompt }
       ],
@@ -235,20 +231,11 @@ Reply with either exactly "QUIET" or the one line. Nothing else.
     const content = response.choices[0]?.message?.content?.trim() ?? "";
     if (!content) return null;
 
-    if (content.toUpperCase() === "QUIET") {
-      return "QUIET";
-    }
-
     return content;
   }
 
   try {
     const first = await callOnce();
-
-    // If the agent chose QUIET, we represent this as null
-    if (first === "QUIET") {
-      return null;
-    }
 
     // If we got a normal line back, use it
     if (first) {
@@ -271,10 +258,6 @@ Reply with either exactly "QUIET" or the one line. Nothing else.
 
       try {
         const second = await callOnce();
-
-        if (second === "QUIET") {
-          return null;
-        }
 
         if (second) {
           return second;
@@ -318,7 +301,6 @@ serve(async (req) => {
     const roomsMap = await getRooms();
 
     let inserted = 0;
-    let quietCount = 0;
 
     // Track which agents moved this tick
     const movedAgents = new Set<string>();
@@ -385,12 +367,6 @@ serve(async (req) => {
 
       const content = await generateMessage(agent, history, room);
 
-      // null means the agent chose to be quiet this tick
-      if (content === null) {
-        quietCount += 1;
-        continue;
-      }
-
       const { error } = await supabase.from("messages").insert({
         from_agent: agent.id,
         room_id: agent.room_id,
@@ -408,7 +384,7 @@ serve(async (req) => {
     }
 
     return new Response(
-      JSON.stringify({ ok: true, inserted, quiet: quietCount }),
+      JSON.stringify({ ok: true, inserted }),
       { headers: { "Content-Type": "application/json" } }
     );
   } catch (err) {
