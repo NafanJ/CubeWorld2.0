@@ -36,7 +36,7 @@ export const PixelRoomGrid: React.FC = () => {
         const chars = inRoom.map((ag) => (ag.name ? ag.name.charAt(0) : '🙂'));
         const usernames = inRoom.map((ag) => ag.name || 'Anon');
         // use themed background or fallback to static images by index
-        const bg = `/rooms/Room1_nochar.png`;
+        const bg = `/rooms/Room3.jpg`;
         return {
           id: r.id,
           roomName: r.name || `Room ${idx + 1}`,
