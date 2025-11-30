@@ -43,16 +43,6 @@ export function RoomCard({
             <p className="text-white text-[8px] pixel-text">{roomName}</p>
           </div>
         )}
-
-        {/* Username label (bottom-left) - show first username if present */}
-        <div className="absolute bottom-2 left-2 bg-black bg-opacity-70 px-2 py-1 rounded border border-white">
-          <p className="text-white text-[8px] pixel-text">{usernames[0] || 'Guest'}</p>
-        </div>
-
-        {/* Status indicator */}
-        <div className="absolute top-2 right-2 flex items-center gap-1">
-          <div className={`w-2 h-2 rounded-full ${status === 'online' ? 'bg-green-400' : 'bg-gray-400'} border border-black`}></div>
-        </div>
       </div>
     </div>;
 }
