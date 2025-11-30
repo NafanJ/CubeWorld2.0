@@ -1,6 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { ChatMessage } from './ChatMessage';
-import { SendIcon } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 // Shared palette for agent colors (kept at module scope so hooks don't need it as a dependency)
@@ -305,7 +304,7 @@ export function ChatPanel() {
       </div>
 
   {/* Messages */}
-  <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-4 space-y-2">
+  <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-4 space-y-2 border-b-8 border-indigo-500">
         {messages.length === 0 && !loading && (
           <div className="text-xs text-gray-500">No messages yet.</div>
         )}
@@ -362,15 +361,7 @@ export function ChatPanel() {
         </div>
       )}
 
-      {/* Input (UI only) */}
-      <div className="p-4 bg-white border-t-8 border-indigo-500">
-        <div className="flex gap-2">
-          <input type="text" placeholder="Type a message..." className="flex-1 px-4 py-3 border-4 border-gray-800 rounded-lg pixel-text text-sm focus:outline-none focus:border-indigo-500 bg-gray-50" />
-          <button className="bg-indigo-500 hover:bg-indigo-600 border-4 border-indigo-700 rounded-lg px-4 py-3 transition-all hover:scale-105 active:scale-95">
-            <SendIcon className="w-5 h-5 text-white" />
-          </button>
-        </div>
-      </div>
+
     </div>
   );
 }
