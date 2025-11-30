@@ -13,6 +13,15 @@ interface RoomUI {
 
 export const PixelRoomGrid: React.FC = () => {
   const [rooms, setRooms] = useState<RoomUI[]>([]);
+  // List of available room images
+  const roomImages = [
+    '/rooms/Room1.jpg',
+    '/rooms/Room2.jpg',
+    '/rooms/Room3.jpg',
+    '/rooms/Room4.jpg',
+    '/rooms/Room5.jpg',
+    '/rooms/Room6.jpg'
+  ];
 
   useEffect(() => {
     const load = async () => {
@@ -35,8 +44,8 @@ export const PixelRoomGrid: React.FC = () => {
         const inRoom = agents.filter((ag) => ag.room_id === r.id);
         const chars = inRoom.map((ag) => (ag.name ? ag.name.charAt(0) : '🙂'));
         const usernames = inRoom.map((ag) => ag.name || 'Anon');
-        // use themed background or fallback to static images by index
-        const bg = `/rooms/Room3.jpg`;
+        // Cycle through available room images by index
+        const bg = roomImages[idx % roomImages.length];
         return {
           id: r.id,
           roomName: r.name || `Room ${idx + 1}`,
