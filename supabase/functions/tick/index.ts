@@ -136,22 +136,39 @@ async function generateMessage(
     return randomCosyLine();
   }
 
-  // Build personality snippet from persona.traits
-  const traits =
-    agent.persona &&
-    Array.isArray(agent.persona.traits)
-      ? (agent.persona.traits as string[])
-      : [];
+  // Enhanced persona extraction
+  const persona = agent.persona || {};
+  const traits = Array.isArray(persona.traits) ? persona.traits : [];
+  const communicationStyle = persona.communicationStyle || "natural";
+  const interests = Array.isArray(persona.interests) ? persona.interests : [];
+  const quirks = Array.isArray(persona.quirks) ? persona.quirks : [];
+  const speechPatterns = Array.isArray(persona.speechPatterns) ? persona.speechPatterns : [];
 
-  const traitsText = traits.length
-    ? `Your personality traits include: ${traits.join(", ")}.`
-    : "";
+  // Build richer personality description
+  let personalityPrompt = "";
+  
+  if (traits.length > 0) {
+    personalityPrompt += `Your core traits: ${traits.join(", ")}.\n`;
+  }
+  
+  if (communicationStyle && communicationStyle !== "natural") {
+    personalityPrompt += `You communicate in a ${communicationStyle} manner.\n`;
+  }
+  
+  if (interests.length > 0) {
+    personalityPrompt += `You care deeply about: ${interests.join(", ")}.\n`;
+  }
+  
+  if (quirks.length > 0) {
+    personalityPrompt += `Your quirks: ${quirks.map((q: string) => `- ${q}`).join("\n")}\n`;
+  }
+
+  if (speechPatterns.length > 0) {
+    personalityPrompt += `Speech style: ${speechPatterns.join(", ")}.\n`;
+  }
 
   // Room context
   const roomName = room?.name || "your small apartment";
-  const roomTheme = room?.theme
-    ? `The room theme is "${room.theme}".`
-    : "";
 
   // Recent history summary for this agent
   const recentLines = history
@@ -164,11 +181,22 @@ async function generateMessage(
       ? recentLines.map((c) => `- ${c}`).join("\n")
       : "(no recent actions recorded yet)";
 
+  // Add variety instructions based on persona
+  let varietyInstructions = "Avoid repeating the exact same actions or wording as above.";
+  
+  if (interests.length > 0 && Math.random() > 0.7) {
+    varietyInstructions += ` Occasionally relate your actions to your interests: ${interests.join(", ")}.`;
+  }
+  
+  if (quirks && quirks.includes("asks_questions") && Math.random() > 0.8) {
+    varietyInstructions += " Feel free to briefly wonder about something.";
+  }
+
   const prompt = `
 You are a cosy, low-key villager called ${agent.name} in a tiny 2x3 apartment block called Cozy Village.
 You belong to provider "${agent.provider}".
-You are currently in a room called "${roomName}". ${roomTheme}
-${traitsText}
+You are currently in a room called "${roomName}".
+${personalityPrompt}
 
 Here are the last few things you have been doing recently (newest first):
 
@@ -186,7 +214,7 @@ If you choose to describe a new action, reply with ONE new short, present-tense 
 describing what you are doing right now in this room.
 
 Keep it gentle, slice-of-life, and grounded.
-Avoid repeating the exact same actions or wording as above.
+${varietyInstructions}
 No emojis, no dialogue. Always write in third person perspective.
 Reply with either exactly "QUIET" or the one line. Nothing else.
 `;
@@ -197,11 +225,11 @@ Reply with either exactly "QUIET" or the one line. Nothing else.
       messages: [
         {
           role: "system",
-          content:
-            "You decide whether to stay quiet or describe one tiny action. Reply with either exactly QUIET or a single short line. No extra commentary."
+          content: `You are ${agent.name} with these traits: ${traits.join(", ") || "versatile"}. Generate one unique, grounded action or reply QUIET. Be varied and avoid repetition.`
         },
         { role: "user", content: prompt }
-      ]
+      ],
+      temperature: 0.8 + (Math.random() * 0.4)
     });
 
     const content = response.choices[0]?.message?.content?.trim() ?? "";
