@@ -28,7 +28,11 @@ export const PixelRoomGrid: React.FC = () => {
     const load = async () => {
       try {
         // Fetch data from Supabase
-        const { data: roomsData, error: rErr } = await supabase.from('rooms').select('id, name, theme');
+        const { data: roomsData, error: rErr } = await supabase
+          .from('rooms')
+          .select('id, name, theme, x, y')
+          .order('y', { ascending: true })
+          .order('x', { ascending: true });
         if (rErr) {
           console.error('Error loading rooms', rErr);
           setIsLoading(false);
