@@ -14,7 +14,7 @@ export function App() {
       </div>
 
       {/* Chat Panel - side by side on large screens, stacked below on mobile */}
-      <div className="w-full lg:w-2/5 lg:h-full h-[35vh] flex-shrink-0 overflow-hidden">
+      <div className="w-full lg:w-2/5 lg:h-full h-[40vh] flex-shrink-0">
         <ChatPanel />
       </div>
     </div>
