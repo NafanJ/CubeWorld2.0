@@ -145,10 +145,16 @@ export function ChatPanel() {
         )}
       </div>
 
-      {/* Lazy render only the active tab to prevent unnecessary data fetches */}
-      {activeTab === 'chat' && <ChatLogTab agentColorMap={agentColorMap} />}
-      {activeTab === 'status' && <StatusTab agentColorMap={agentColorMap} />}
-      {activeTab === 'system' && <SystemTab />}
+      {/* Keep all tabs mounted but hidden to preserve state */}
+      <div style={{ display: activeTab === 'chat' ? 'flex' : 'none' }} className="flex flex-col flex-1 min-h-0">
+        <ChatLogTab agentColorMap={agentColorMap} />
+      </div>
+      <div style={{ display: activeTab === 'status' ? 'block' : 'none' }} className="flex-1 min-h-0 flex flex-col">
+        <StatusTab agentColorMap={agentColorMap} />
+      </div>
+      <div style={{ display: activeTab === 'system' ? 'block' : 'none' }} className="flex-1 min-h-0 flex flex-col">
+        <SystemTab />
+      </div>
     </div>
   );
 }
