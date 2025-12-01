@@ -152,7 +152,7 @@ export function StatusTab({ agentColorMap }: StatusTabProps) {
           return (
             <div
               key={agent.id}
-              className="bg-white border-4 border-indigo-300 rounded-lg p-3 pixel-border-sm"
+              className="bg-white border-4 border-indigo-300 rounded-lg p-3 pixel-border-sm animate-slide-in"
             >
               <div className="flex items-start gap-3">
                 {/* Agent Avatar */}
