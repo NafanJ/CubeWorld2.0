@@ -215,7 +215,7 @@ export function StatusTab({ agentColorMap }: StatusTabProps) {
                           key={idx}
                           className="px-2 py-0.5 bg-purple-100 text-purple-700 rounded text-[10px] border border-purple-300"
                         >
-                          {trait}
+                          {trait.charAt(0).toUpperCase() + trait.slice(1)}
                         </span>
                       ))}
                     </div>
