@@ -149,10 +149,10 @@ export function ChatPanel() {
       <div style={{ display: activeTab === 'chat' ? 'flex' : 'none' }} className="flex flex-col flex-1 min-h-0">
         <ChatLogTab agentColorMap={agentColorMap} />
       </div>
-      <div style={{ display: activeTab === 'status' ? 'block' : 'none' }} className="flex-1 min-h-0 flex flex-col">
+      <div style={{ display: activeTab === 'status' ? 'flex' : 'none' }} className="flex-1 min-h-0 flex flex-col">
         <StatusTab agentColorMap={agentColorMap} />
       </div>
-      <div style={{ display: activeTab === 'system' ? 'block' : 'none' }} className="flex-1 min-h-0 flex flex-col">
+      <div style={{ display: activeTab === 'system' ? 'flex' : 'none' }} className="flex-1 min-h-0 flex flex-col">
         <SystemTab />
       </div>
     </div>
