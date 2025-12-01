@@ -145,13 +145,9 @@ export function ChatPanel() {
         )}
       </div>
 
-      {/* Chat Log Tab Content */}
-      {activeTab === 'chat' && <ChatLogTab />}
-
-      {/* Status Tab Content */}
+      {/* Lazy render only the active tab to prevent unnecessary data fetches */}
+      {activeTab === 'chat' && <ChatLogTab agentColorMap={agentColorMap} />}
       {activeTab === 'status' && <StatusTab agentColorMap={agentColorMap} />}
-
-      {/* System Tab Content */}
       {activeTab === 'system' && <SystemTab />}
     </div>
   );

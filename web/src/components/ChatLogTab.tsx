@@ -70,11 +70,15 @@ function hashString(s: string) {
   return h;
 }
 
-export function ChatLogTab() {
+interface ChatLogTabProps {
+  agentColorMap: Record<string, string>;
+}
+
+export function ChatLogTab({ agentColorMap: parentAgentColorMap }: ChatLogTabProps) {
   const [messages, setMessages] = useState<SupaMessage[]>([]);
   const [agentMap, setAgentMap] = useState<Record<string, string>>({});
   const [selectedAgent, setSelectedAgent] = useState<string>('all');
-  const [agentColorMap, setAgentColorMap] = useState<Record<string, string>>({});
+  const [agentColorMap, setAgentColorMap] = useState<Record<string, string>>(parentAgentColorMap);
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState<string>('');
   const [availableDates, setAvailableDates] = useState<string[]>([]);
@@ -146,9 +150,12 @@ export function ChatLogTab() {
   }, [selectedDate]);
 
   useEffect(() => {
-    setLoading(true);
-    loadMessages();
-    setLoading(false);
+    const initialLoad = async () => {
+      setLoading(true);
+      await loadMessages();
+      setLoading(false);
+    };
+    initialLoad();
   }, []);
 
   useEffect(() => {
@@ -169,13 +176,15 @@ export function ChatLogTab() {
       setAgentMap(map);
       
       const ids = Object.keys(map).sort((a, b) => map[a].localeCompare(map[b]));
-      const colorMap: Record<string, string> = {};
-      const used = new Set<string>();
+      const colorMap: Record<string, string> = { ...parentAgentColorMap };
+      const used = new Set<string>(Object.values(parentAgentColorMap));
       for (let i = 0; i < ids.length; i++) {
         const id = ids[i];
-        const c = PALETTE.find((p: string) => !used.has(p)) || PALETTE[i % PALETTE.length];
-        colorMap[id] = c;
-        used.add(c);
+        if (!colorMap[id]) {
+          const c = PALETTE.find((p: string) => !used.has(p)) || PALETTE[i % PALETTE.length];
+          colorMap[id] = c;
+          used.add(c);
+        }
       }
       setAgentColorMap(colorMap);
     };
@@ -193,8 +202,8 @@ export function ChatLogTab() {
           if (newRow && newRow.id && newRow.name) {
             setAgentMap((prev) => ({ ...prev, [newRow.id]: newRow.name as string }));
             setAgentColorMap((prev) => {
-              if (prev[newRow.id]) return prev;
-              const used = new Set(Object.values(prev));
+              if (prev[newRow.id] || parentAgentColorMap[newRow.id]) return { ...prev, ...parentAgentColorMap };
+              const used = new Set(Object.values({ ...prev, ...parentAgentColorMap }));
               const c = PALETTE.find((p: string) => !used.has(p)) || PALETTE[Object.keys(prev).length % PALETTE.length];
               return { ...prev, [newRow.id]: c };
             });
@@ -385,6 +394,19 @@ export function ChatLogTab() {
 
       {/* Messages Content */}
       <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-4 space-y-2 border-b-8 border-indigo-500">
+        {loading && (
+          <div className="space-y-2">
+            {[1, 2, 3, 4, 5].map((i) => (
+              <div key={i} className="flex items-center gap-3 animate-pulse">
+                <div className="w-10 h-10 rounded-lg bg-gray-300" />
+                <div className="flex-1 space-y-2">
+                  <div className="h-3 bg-gray-300 rounded w-1/4" />
+                  <div className="h-8 bg-gray-300 rounded w-full" />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
         {messages.length === 0 && !loading && (
           <div className="text-xs text-gray-500">No messages yet.</div>
         )}

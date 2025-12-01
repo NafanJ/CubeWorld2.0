@@ -52,6 +52,7 @@ function getMoodColor(mood: number): string {
 export function StatusTab({ agentColorMap }: StatusTabProps) {
   const [agents, setAgents] = useState<Agent[]>([]);
   const [rooms, setRooms] = useState<Record<string, string>>({});
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     let mounted = true;
@@ -63,11 +64,13 @@ export function StatusTab({ agentColorMap }: StatusTabProps) {
       
       if (error) {
         console.error('Error loading agent details', error);
+        if (mounted) setIsLoading(false);
         return;
       }
       
       if (!mounted || !data) return;
       setAgents(data as Agent[]);
+      if (mounted) setIsLoading(false);
     };
 
     loadAgentDetails();
@@ -115,6 +118,26 @@ export function StatusTab({ agentColorMap }: StatusTabProps) {
       mounted = false;
     };
   }, []);
+
+  // Show skeleton UI while loading
+  if (isLoading) {
+    return (
+      <div className="flex-1 overflow-y-auto p-4 space-y-3">
+        {[1, 2, 3, 4, 5, 6].map((i) => (
+          <div key={i} className="bg-gray-200 border-4 border-gray-300 rounded-lg p-3 pixel-border-sm animate-pulse">
+            <div className="flex items-start gap-3">
+              <div className="w-12 h-12 rounded-full bg-gray-300" />
+              <div className="flex-1 space-y-2">
+                <div className="h-4 bg-gray-300 rounded w-1/3" />
+                <div className="h-3 bg-gray-300 rounded w-full" />
+                <div className="h-3 bg-gray-300 rounded w-2/3" />
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
 
   return (
     <div className="flex-1 overflow-y-auto p-4 space-y-3">
