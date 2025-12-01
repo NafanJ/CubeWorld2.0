@@ -9,12 +9,12 @@ export function App() {
       style={{ backgroundImage: 'url(/backgroundImage.jpg)', backgroundSize: 'cover', backgroundPosition: 'center' }}
     >
       {/* Room Grid */}
-      <div className="w-full lg:w-3/5 flex items-center justify-center p-4 flex-shrink-0 lg:flex-1">
+      <div className="w-full lg:w-3/5 flex-1 flex items-center justify-center p-4">
         <PixelRoomGrid />
       </div>
 
       {/* Chat Panel - side by side on large screens, stacked below on mobile */}
-      <div className="w-full lg:w-2/5 lg:h-screen h-1/2">
+      <div className="w-full lg:w-2/5 lg:h-screen h-[35vh]">
         <ChatPanel />
       </div>
     </div>
