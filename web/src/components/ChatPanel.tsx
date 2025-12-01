@@ -399,10 +399,6 @@ export function ChatPanel() {
               </span>
             )}
           </div>
-
-          <p className="pixel-text text-indigo-200 text-xs">
-            {loading ? 'Connecting…' : `${filteredMessages.length} / ${messages.length} messages`}
-          </p>
           <div className="ml-auto">
             <label className="pixel-text text-indigo-100 text-xs mr-2">Filter:</label>
             <select
