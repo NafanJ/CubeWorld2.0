@@ -1,8 +1,9 @@
 
 with grid as (
   select * from (values
-    ('Garden Nook',0,0),('Workshop',1,0),('Square',2,0),
-    ('Library',0,1),('Studio',1,1),('Porch',2,1)
+    ('Garden Nook',0,0),('Elevator 3',1,0),('Square',2,0),
+    ('Library',0,1),('Elevator 2',1,1),('Porch',2,1),
+    ('Workshop',0,2),('Elevator 1',1,2),('Studio',2,2)
   ) v(name,x,y)
 )
 insert into rooms(name,x,y) select name,x,y from grid;

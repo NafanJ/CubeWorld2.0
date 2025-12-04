@@ -82,6 +82,74 @@ async function getRooms(): Promise<Map<string, Room>> {
 }
 
 /**
+ * Calculate path from one room to another, using elevators when changing floors.
+ * Elevators are always at x=1.
+ * Returns array of room IDs representing the path (excluding the starting room).
+ */
+function calculatePath(
+  fromRoom: Room,
+  toRoom: Room,
+  roomsMap: Map<string, Room>
+): string[] {
+  // If same room, no path needed
+  if (fromRoom.id === toRoom.id) return [];
+
+  const path: string[] = [];
+  
+  // Helper to find room by coordinates
+  const findRoomByCoords = (x: number, y: number): Room | undefined => {
+    for (const room of roomsMap.values()) {
+      if (room.x === x && room.y === y) return room;
+    }
+    return undefined;
+  };
+
+  const currentX = fromRoom.x ?? 0;
+  const currentY = fromRoom.y ?? 0;
+  const targetX = toRoom.x ?? 0;
+  const targetY = toRoom.y ?? 0;
+
+  // Same floor (same y) - can move directly horizontally
+  if (currentY === targetY) {
+    // Move horizontally step by step
+    const xDirection = targetX > currentX ? 1 : -1;
+    for (let x = currentX + xDirection; x !== targetX + xDirection; x += xDirection) {
+      const room = findRoomByCoords(x, currentY);
+      if (room) path.push(room.id);
+    }
+  } else {
+    // Different floors - must use elevators
+    
+    // Step 1: Move horizontally to elevator column (x=1) if not already there
+    if (currentX !== 1) {
+      const xDirection = 1 - currentX > 0 ? 1 : -1;
+      for (let x = currentX + xDirection; x !== 1 + xDirection; x += xDirection) {
+        const room = findRoomByCoords(x, currentY);
+        if (room) path.push(room.id);
+      }
+    }
+
+    // Step 2: Move vertically through elevators to target floor
+    const yDirection = targetY > currentY ? 1 : -1;
+    for (let y = currentY + yDirection; y !== targetY + yDirection; y += yDirection) {
+      const room = findRoomByCoords(1, y);
+      if (room) path.push(room.id);
+    }
+
+    // Step 3: Move horizontally from elevator to target room
+    if (targetX !== 1) {
+      const xDirection = targetX - 1 > 0 ? 1 : -1;
+      for (let x = 1 + xDirection; x !== targetX + xDirection; x += xDirection) {
+        const room = findRoomByCoords(x, targetY);
+        if (room) path.push(room.id);
+      }
+    }
+  }
+
+  return path;
+}
+
+/**
  * Fetch recent messages and group them by agent.
  * We fetch e.g. 200 most recent and keep up to `limitPerAgent` per agent.
  */
@@ -305,49 +373,79 @@ serve(async (req) => {
     // Track which agents moved this tick
     const movedAgents = new Set<string>();
 
-    // Phase 1: Move agents first, before generating messages
-    // Build a list of room ids to pick from
+    // Phase 1: Move agents along their paths
     const roomIds = Array.from(roomsMap.keys());
     for (const agent of agents) {
       try {
-        // 15% chance to move this tick
-        if (Math.random() > 0.15) continue;
+        if (!agent.room_id) continue;
 
-        const current = agent.room_id;
-        // pick a different room at random
-        const candidates = roomIds.filter((r) => r !== current);
-        if (candidates.length === 0) continue;
-        const newRoom = candidates[Math.floor(Math.random() * candidates.length)];
+        const currentRoom = roomsMap.get(agent.room_id);
+        if (!currentRoom) continue;
 
-        const { error: uErr } = await supabase
-          .from('agents')
-          .update({ room_id: newRoom })
-          .eq('id', agent.id);
+        // Check if agent has a path stored in memory
+        const memory = agent.persona || {};
+        let path = Array.isArray(memory.path) ? memory.path : [];
 
-        if (uErr) {
-          console.error('Error moving agent', agent.id, uErr);
-          continue;
+        // If no path or path is empty, 15% chance to pick a new destination
+        if (path.length === 0 && Math.random() <= 0.15) {
+          // Pick a random destination room (different from current)
+          const candidates = roomIds.filter((r) => r !== agent.room_id);
+          if (candidates.length > 0) {
+            const destinationId = candidates[Math.floor(Math.random() * candidates.length)];
+            const destinationRoom = roomsMap.get(destinationId);
+            
+            if (destinationRoom) {
+              // Calculate path using pathfinding
+              path = calculatePath(currentRoom, destinationRoom, roomsMap);
+              
+              // Store path in memory (persona field, not actual memory field)
+              memory.path = path;
+            }
+          }
         }
 
-        // Mark this agent as moved
-        movedAgents.add(agent.id);
+        // If agent has a path, move to the next room
+        if (path.length > 0) {
+          const nextRoomId = path[0];
+          const nextRoom = roomsMap.get(nextRoomId);
+          
+          if (nextRoom) {
+            // Update agent's room and remove first step from path
+            const updatedPath = path.slice(1);
+            const updatedPersona = { ...memory, path: updatedPath };
 
-        // Insert a movement message
-        const newRoomName = roomsMap.get(newRoom)?.name || `room ${newRoom.substring(0, 8)}`;
-        const { error: msgErr } = await supabase.from("messages").insert({
-          from_agent: agent.id,
-          room_id: newRoom,
-          content: `${agent.name} moves to ${newRoomName}`
-          // ts defaults to now()
-          // mood_tag left null for now
-        });
+            const { error: uErr } = await supabase
+              .from('agents')
+              .update({ 
+                room_id: nextRoomId,
+                persona: updatedPersona
+              })
+              .eq('id', agent.id);
 
-        if (msgErr) {
-          console.error('Error inserting movement message:', msgErr);
-          continue;
+            if (uErr) {
+              console.error('Error moving agent', agent.id, uErr);
+              continue;
+            }
+
+            // Mark this agent as moved
+            movedAgents.add(agent.id);
+
+            // Insert a movement message
+            const nextRoomName = nextRoom.name || `room ${nextRoomId.substring(0, 8)}`;
+            const { error: msgErr } = await supabase.from("messages").insert({
+              from_agent: agent.id,
+              room_id: nextRoomId,
+              content: `${agent.name} moves to ${nextRoomName}`
+            });
+
+            if (msgErr) {
+              console.error('Error inserting movement message:', msgErr);
+              continue;
+            }
+
+            inserted += 1;
+          }
         }
-
-        inserted += 1;
       } catch (moveErr) {
         console.error('Error in moving agents:', moveErr);
       }

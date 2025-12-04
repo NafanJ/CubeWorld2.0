@@ -23,7 +23,7 @@ export function RoomCard({
     purple: 'bg-orange-300',
     teal: 'bg-teal-200'
   };
-  return <div className="w-full aspect-video">
+  return <div className="w-full h-full">
       <div 
         className={`${!backgroundImage ? roomBgs[color as keyof typeof roomBgs] : ''} w-full h-full relative overflow-hidden pixel-room bg-cover bg-center rounded-lg`}
         style={backgroundImage ? { backgroundImage: `url(${backgroundImage})`, backgroundSize: 'cover', backgroundRepeat: 'no-repeat', backgroundPosition: 'center' } : undefined}
