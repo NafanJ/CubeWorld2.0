@@ -30,6 +30,8 @@ export const PixelRoomGrid: React.FC = () => {
   ];
 
   useEffect(() => {
+    let mounted = true;
+
     const load = async () => {
       try {
         // Fetch data from Supabase
@@ -40,14 +42,14 @@ export const PixelRoomGrid: React.FC = () => {
           .order('x', { ascending: true });
         if (rErr) {
           console.error('Error loading rooms', rErr);
-          setIsLoading(false);
+          if (mounted) setIsLoading(false);
           return;
         }
 
         const { data: agentsData, error: aErr } = await supabase.from('agents').select('id, name, room_id');
         if (aErr) {
           console.error('Error loading agents', aErr);
-          setIsLoading(false);
+          if (mounted) setIsLoading(false);
           return;
         }
 
@@ -85,11 +87,12 @@ export const PixelRoomGrid: React.FC = () => {
 
         await Promise.all(imagePromises);
 
+        if (!mounted) return;
         setRooms(uiRooms);
         setIsLoading(false);
       } catch (err) {
         console.error('Error loading room data:', err);
-        setIsLoading(false);
+        if (mounted) setIsLoading(false);
       }
     };
 
@@ -101,19 +104,20 @@ export const PixelRoomGrid: React.FC = () => {
         'postgres_changes',
         { event: '*', schema: 'public', table: 'agents' },
         () => {
-          void load();
+          if (mounted) void load();
         }
       )
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'rooms' },
         () => {
-          void load();
+          if (mounted) void load();
         }
       )
       .subscribe();
 
     return () => {
+      mounted = false;
       void supabase.removeChannel(channel);
     };
   }, []);
