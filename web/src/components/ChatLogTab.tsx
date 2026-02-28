@@ -1,28 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { ChatMessage } from './ChatMessage';
 import { supabase } from '../lib/supabase';
-
-// Shared palette for agent colors
-const PALETTE = [
-  'red',
-  'orange',
-  'green',
-  'blue',
-  'purple',
-  'teal',
-  'yellow',
-  'pink',
-  'indigo',
-  'lime',
-  'amber',
-  'rose',
-  'cyan',
-  'sky',
-  'violet',
-  'emerald',
-  'fuchsia',
-  'slate'
-];
+import { PALETTE } from '../lib/colorUtils';
 
 type SupaMessage = {
   id: number;
@@ -90,6 +69,12 @@ export function ChatLogTab({ agentColorMap: parentAgentColorMap }: ChatLogTabPro
   const messagesRef = useRef<SupaMessage[]>([]);
   const hasScrolledRef = useRef<boolean>(false);
   const [newMessageCount, setNewMessageCount] = useState(0);
+  const isMounted = useRef(true);
+
+  useEffect(() => {
+    isMounted.current = true;
+    return () => { isMounted.current = false; };
+  }, []);
 
   const scrollToBottom = useCallback((behavior: ScrollBehavior = 'auto') => {
     const el = messagesContainerRef.current;
@@ -126,8 +111,10 @@ export function ChatLogTab({ agentColorMap: parentAgentColorMap }: ChatLogTabPro
 
     if (data) {
       const ordered = (data as SupaMessage[]).reverse();
+
+      if (!isMounted.current) return null;
       setMessages(ordered);
-      
+
       const dateToCount: Record<string, number> = {};
       for (const msg of ordered) {
         const dateKey = getDateKey(msg.ts);
@@ -135,15 +122,15 @@ export function ChatLogTab({ agentColorMap: parentAgentColorMap }: ChatLogTabPro
           dateToCount[dateKey] = (dateToCount[dateKey] || 0) + 1;
         }
       }
-      
+
       const dates = Object.keys(dateToCount).sort().reverse();
       setAvailableDates(dates);
       setDayMessageCounts(dateToCount);
-      
+
       if (!selectedDate && dates.length > 0) {
         setSelectedDate(dates[0]);
       }
-      
+
       return ordered;
     }
     return null;
@@ -153,7 +140,7 @@ export function ChatLogTab({ agentColorMap: parentAgentColorMap }: ChatLogTabPro
     const initialLoad = async () => {
       setLoading(true);
       await loadMessages();
-      setLoading(false);
+      if (isMounted.current) setLoading(false);
     };
     initialLoad();
   }, []);
@@ -239,22 +226,21 @@ export function ChatLogTab({ agentColorMap: parentAgentColorMap }: ChatLogTabPro
           console.log('[ChatLogTab] New message detected, reloading...');
           const prevLen = messagesRef.current.length;
           const newData = await loadMessages();
-          if (newData) {
-            const added = newData.length - prevLen;
-            if (added > 0) {
-              const el = messagesContainerRef.current;
-              let atBottom = isAtBottomRef.current;
-              if (el) {
-                const distanceFromBottom = el.scrollHeight - (el.scrollTop + el.clientHeight);
-                atBottom = distanceFromBottom <= 120;
-                isAtBottomRef.current = atBottom;
-              }
+          if (!isMounted.current || !newData) return;
+          const added = newData.length - prevLen;
+          if (added > 0) {
+            const el = messagesContainerRef.current;
+            let atBottom = isAtBottomRef.current;
+            if (el) {
+              const distanceFromBottom = el.scrollHeight - (el.scrollTop + el.clientHeight);
+              atBottom = distanceFromBottom <= 120;
+              isAtBottomRef.current = atBottom;
+            }
 
-              if (hasScrolledRef.current || !atBottom) {
-                setNewMessageCount((c) => c + added);
-              } else {
-                setNewMessageCount(0);
-              }
+            if (hasScrolledRef.current || !atBottom) {
+              setNewMessageCount((c) => c + added);
+            } else {
+              setNewMessageCount(0);
             }
           }
         }

@@ -1,30 +1,9 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
+import { PALETTE, buildAgentColorMap } from '../lib/colorUtils';
 import { ChatLogTab } from './ChatLogTab';
 import { StatusTab } from './StatusTab';
 import { SystemTab } from './SystemTab';
-
-// Shared palette for agent colors
-const PALETTE = [
-  'red',
-  'orange',
-  'green',
-  'blue',
-  'purple',
-  'teal',
-  'yellow',
-  'pink',
-  'indigo',
-  'lime',
-  'amber',
-  'rose',
-  'cyan',
-  'sky',
-  'violet',
-  'emerald',
-  'fuchsia',
-  'slate'
-];
 
 type TabType = 'chat' | 'status' | 'system';
 
@@ -44,22 +23,8 @@ export function ChatPanel() {
 
       if (!mounted || !data) return;
 
-      const map: Record<string, string> = {};
-      for (const a of data as Array<{ id: string; name: string }>) {
-        if (a?.id && a?.name) map[a.id] = a.name;
-      }
-      
-      // Assign unique colors to agents (deterministic and stable)
-      const ids = Object.keys(map).sort((a, b) => map[a].localeCompare(map[b]));
-      const colorMap: Record<string, string> = {};
-      const used = new Set<string>();
-      for (let i = 0; i < ids.length; i++) {
-        const id = ids[i];
-        const c = PALETTE.find((p: string) => !used.has(p)) || PALETTE[i % PALETTE.length];
-        colorMap[id] = c;
-        used.add(c);
-      }
-      setAgentColorMap(colorMap);
+      const agents = (data as Array<{ id: string; name: string }>).filter((a) => a?.id && a?.name);
+      setAgentColorMap(buildAgentColorMap(agents));
     };
 
     loadAgents();

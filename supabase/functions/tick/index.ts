@@ -285,7 +285,7 @@ Reply with the one line. Nothing else.
 
   async function callOnce(): Promise<string | null> {
     const response = await openai.chat.completions.create({
-      model: "gpt-4.1-mini",
+      model: "gpt-4o-mini",
       messages: [
         {
           role: "system",
@@ -479,6 +479,12 @@ serve(async (req) => {
       }
 
       inserted += 1;
+    }
+
+    // Increment the global tick counter
+    const { error: tickErr } = await supabase.rpc("increment_tick_count");
+    if (tickErr) {
+      console.error("Error incrementing tick_count:", tickErr);
     }
 
     return new Response(

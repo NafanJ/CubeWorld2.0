@@ -12,7 +12,7 @@ jobs:
     steps:
       - name: Call Supabase tick Edge Function
         run: |
-          curl -X POST \
+          curl -f --max-time 120 -X POST \
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}" \
             -H "x-cron-secret: ${{ secrets.CRON_SECRET }}" \
