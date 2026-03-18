@@ -488,15 +488,15 @@ export function ChatLogTab({ agentColorMap: parentAgentColorMap, agentNameMap }:
   return (
     <>
       {/* Header Content */}
-      <div className="bg-indigo-50 p-3 border-b-4 border-indigo-300">
+      <div className="bg-indigo-50 p-2 sm:p-3 border-b-4 border-indigo-300">
         {selectedDate && (
-          <div className="mb-3 inline-block bg-indigo-700 text-indigo-100 px-3 py-1 rounded-md border-2 border-indigo-800 pixel-text text-xs">
-            Viewing: {formatDateHeader(selectedDate)}
+          <div className="mb-2 inline-block bg-indigo-700 text-indigo-100 px-2 py-1 rounded-md border-2 border-indigo-800 pixel-text text-xs truncate max-w-full">
+            {formatDateHeader(selectedDate)}
           </div>
         )}
 
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+          <div className="flex items-center gap-1 flex-wrap">
             <button
               onClick={goToPreviousDay}
               disabled={!canGoBack}
@@ -522,17 +522,17 @@ export function ChatLogTab({ agentColorMap: parentAgentColorMap, agentNameMap }:
               Next →
             </button>
             {selectedDate && dayMessageCounts[selectedDate] !== undefined && (
-              <span className="pixel-text text-indigo-700 text-xs ml-2">
-                ({dayMessageCounts[selectedDate]} message{dayMessageCounts[selectedDate] === 1 ? '' : 's'})
+              <span className="pixel-text text-indigo-700 text-xs">
+                ({dayMessageCounts[selectedDate]} msg{dayMessageCounts[selectedDate] === 1 ? '' : 's'})
               </span>
             )}
           </div>
-          <div className="ml-auto">
-            <label className="pixel-text text-indigo-900 text-xs mr-2">Filter:</label>
+          <div className="flex items-center gap-2 sm:ml-auto">
+            <label className="pixel-text text-indigo-900 text-xs">Filter:</label>
             <select
               value={selectedAgent}
               onChange={(e) => setSelectedAgent(e.target.value)}
-              className="text-xs px-2 py-1 rounded-md bg-indigo-600 text-white border-2 border-indigo-800"
+              className="flex-1 text-xs px-2 py-1 rounded-md bg-indigo-600 text-white border-2 border-indigo-800 min-w-0"
             >
               <option value="all">All agents</option>
               {Object.entries(agentMap)

@@ -77,20 +77,21 @@ export function ChatPanel() {
     <div className="relative flex flex-col h-full bg-gradient-to-br from-indigo-100 to-purple-100 border-l-8 border-indigo-500">
       {/* Tab Navigation Header */}
       <div className="bg-indigo-500 border-b-8 border-indigo-700 p-4 pixel-border-bottom">
-        <div className="flex gap-2 mb-3">
+        <div className="flex gap-1 mb-3">
           <button
             onClick={() => setActiveTab('chat')}
-            className={`px-4 py-2 rounded-md pixel-text text-xs font-bold transition-colors ${
+            className={`flex-1 px-1 py-2 rounded-md pixel-text text-xs font-bold transition-colors ${
               activeTab === 'chat'
                 ? 'bg-indigo-700 text-white border-2 border-indigo-900'
                 : 'bg-indigo-400 text-indigo-900 border-2 border-indigo-600 hover:bg-indigo-500'
             }`}
           >
-            CHAT LOG
+            <span className="hidden sm:inline">CHAT LOG</span>
+            <span className="sm:hidden">CHAT</span>
           </button>
           <button
             onClick={() => setActiveTab('status')}
-            className={`px-4 py-2 rounded-md pixel-text text-xs font-bold transition-colors ${
+            className={`flex-1 px-1 py-2 rounded-md pixel-text text-xs font-bold transition-colors ${
               activeTab === 'status'
                 ? 'bg-indigo-700 text-white border-2 border-indigo-900'
                 : 'bg-indigo-400 text-indigo-900 border-2 border-indigo-600 hover:bg-indigo-500'
@@ -100,7 +101,7 @@ export function ChatPanel() {
           </button>
           <button
             onClick={() => setActiveTab('diary')}
-            className={`px-4 py-2 rounded-md pixel-text text-xs font-bold transition-colors ${
+            className={`flex-1 px-1 py-2 rounded-md pixel-text text-xs font-bold transition-colors ${
               activeTab === 'diary'
                 ? 'bg-amber-700 text-white border-2 border-amber-900'
                 : 'bg-indigo-400 text-indigo-900 border-2 border-indigo-600 hover:bg-indigo-500'
@@ -110,13 +111,14 @@ export function ChatPanel() {
           </button>
           <button
             onClick={() => setActiveTab('system')}
-            className={`px-4 py-2 rounded-md pixel-text text-xs font-bold transition-colors ${
+            className={`flex-1 px-1 py-2 rounded-md pixel-text text-xs font-bold transition-colors ${
               activeTab === 'system'
                 ? 'bg-indigo-700 text-white border-2 border-indigo-900'
                 : 'bg-indigo-400 text-indigo-900 border-2 border-indigo-600 hover:bg-indigo-500'
             }`}
           >
-            SYSTEM
+            <span className="hidden sm:inline">SYSTEM</span>
+            <span className="sm:hidden">SYS</span>
           </button>
         </div>
         

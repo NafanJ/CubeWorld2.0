@@ -125,7 +125,7 @@ export const PixelRoomGrid: React.FC = () => {
   // Skeleton UI while loading
   if (isLoading) {
     return (
-      <div className="grid grid-cols-2 lg:grid-cols-7 gap-2 lg:gap-3 max-w-5xl w-full auto-rows-fr">
+      <div className="grid grid-cols-2 lg:grid-cols-7 gap-2 lg:gap-3 max-w-5xl w-full">
         {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((i) => {
           const isElevatorPos = i === 2 || i === 5 || i === 8;
           return (
@@ -140,7 +140,7 @@ export const PixelRoomGrid: React.FC = () => {
 
   return (
     <>
-      <div className="grid grid-cols-2 lg:grid-cols-7 gap-2 lg:gap-3 max-w-5xl w-full auto-rows-fr">
+      <div className="grid grid-cols-2 lg:grid-cols-7 gap-2 lg:gap-3 max-w-5xl w-full">
         {rooms.map((room) => (
           <div key={room.id} className={room.isElevator ? 'hidden lg:block col-span-1' : 'aspect-square lg:aspect-video col-span-1 lg:col-span-3'}>
             {room.isElevator ? (
