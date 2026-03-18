@@ -693,10 +693,21 @@ No emojis. Just the diary text, nothing else.
 /*  Main tick handler                                                  */
 /* ------------------------------------------------------------------ */
 
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-cron-secret",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
+
 serve(async (req: Request) => {
+  // Handle CORS preflight
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders });
+  }
+
   try {
     if (req.method !== "POST") {
-      return new Response("Method not allowed", { status: 405 });
+      return new Response("Method not allowed", { status: 405, headers: corsHeaders });
     }
 
     // Optional simple auth with a shared secret
@@ -704,7 +715,7 @@ serve(async (req: Request) => {
     if (cronSecret) {
       const header = req.headers.get("x-cron-secret");
       if (header !== cronSecret) {
-        return new Response("Unauthorised", { status: 401 });
+        return new Response("Unauthorised", { status: 401, headers: corsHeaders });
       }
     }
 
@@ -1177,10 +1188,10 @@ serve(async (req: Request) => {
 
     return new Response(
       JSON.stringify({ ok: true, inserted }),
-      { headers: { "Content-Type": "application/json" } }
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (err: unknown) {
     console.error("Tick function error:", (err as Error)?.message ?? String(err));
-    return new Response("Internal error", { status: 500 });
+    return new Response("Internal error", { status: 500, headers: corsHeaders });
   }
 });
