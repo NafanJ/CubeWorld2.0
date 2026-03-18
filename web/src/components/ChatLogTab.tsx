@@ -276,19 +276,28 @@ export function ChatLogTab({ agentColorMap: parentAgentColorMap, agentNameMap }:
     if (!text || sending) return;
 
     setSending(true);
+    setUserInput('');
     try {
       const mentions = parseMentions(text);
+      console.log('[ChatLogTab] Parsed mentions:', mentions, 'from agentNameMap:', agentNameMap, 'rooms:', rooms.map(r => r.name));
       const hasMentions = mentions.agents.length > 0 || mentions.rooms.length > 0;
 
       if (hasMentions) {
         // Call the reply edge function for instant agent responses
-        const { error } = await supabase.functions.invoke('reply', {
+        // The function inserts the user message + generates agent replies server-side
+        const { data, error } = await supabase.functions.invoke('reply', {
           body: { content: text, mentions },
         });
         if (error) {
           console.error('Error sending message:', error);
+          // If the function failed, insert the user message directly as fallback
+          await supabase.from('messages').insert({
+            content: text,
+            room_id: rooms.length > 0 ? rooms[0].id : null,
+            from_agent: null,
+          });
         } else {
-          setUserInput('');
+          console.log('Reply result:', data);
         }
       } else {
         // No mentions — just insert as a regular visitor message
@@ -299,8 +308,6 @@ export function ChatLogTab({ agentColorMap: parentAgentColorMap, agentNameMap }:
         });
         if (error) {
           console.error('Error sending message:', error);
-        } else {
-          setUserInput('');
         }
       }
     } finally {
