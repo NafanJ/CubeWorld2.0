@@ -12,6 +12,8 @@ export function SystemTab() {
   const [totalMessages, setTotalMessages] = useState(0);
   const [totalAgents, setTotalAgents] = useState(0);
   const [activeAgents, setActiveAgents] = useState(0);
+  const [tickLoading, setTickLoading] = useState(false);
+  const [tickResult, setTickResult] = useState<'success' | 'error' | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -57,6 +59,23 @@ export function SystemTab() {
     };
   }, []);
 
+  const handleRunTick = async () => {
+    setTickLoading(true);
+    setTickResult(null);
+    try {
+      const { error } = await supabase.functions.invoke('tick', { method: 'POST' });
+      if (error) throw error;
+      setTickResult('success');
+      setTimeout(() => setTickResult(null), 2000);
+    } catch (err) {
+      console.error('Tick failed', err);
+      setTickResult('error');
+      setTimeout(() => setTickResult(null), 3000);
+    } finally {
+      setTickLoading(false);
+    }
+  };
+
   return (
     <div className="flex-1 overflow-y-auto p-4 space-y-4">
       {/* Statistics */}
@@ -84,6 +103,28 @@ export function SystemTab() {
             <span className="text-xs text-gray-900 font-bold">{activeAgents}</span>
           </div>
         </div>
+      </div>
+
+      {/* Run Tick */}
+      <div className="bg-white border-4 border-indigo-300 rounded-lg p-4 pixel-border-sm animate-slide-in">
+        <h3 className="pixel-text text-sm font-bold text-indigo-900 mb-3">CONTROLS</h3>
+        <button
+          onClick={handleRunTick}
+          disabled={tickLoading}
+          className={`pixel-text text-xs px-4 py-2 rounded-md font-bold border-2 transition-colors ${
+            tickLoading
+              ? 'bg-indigo-300 text-indigo-500 border-indigo-400 cursor-not-allowed'
+              : 'bg-indigo-600 text-white border-indigo-800 hover:bg-indigo-700'
+          }`}
+        >
+          {tickLoading ? 'RUNNING...' : 'RUN TICK'}
+        </button>
+        {tickResult === 'success' && (
+          <span className="ml-3 text-xs font-semibold text-green-600">Tick completed!</span>
+        )}
+        {tickResult === 'error' && (
+          <span className="ml-3 text-xs font-semibold text-red-600">Tick failed</span>
+        )}
       </div>
 
       {/* World Rules */}
