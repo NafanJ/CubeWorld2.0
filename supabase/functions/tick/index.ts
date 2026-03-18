@@ -710,13 +710,17 @@ serve(async (req: Request) => {
       return new Response("Method not allowed", { status: 405, headers: corsHeaders });
     }
 
-    // Optional simple auth with a shared secret
+    // Auth: accept either the cron secret or a valid Supabase anon/service key
     const cronSecret = Deno.env.get("CRON_SECRET");
-    if (cronSecret) {
-      const header = req.headers.get("x-cron-secret");
-      if (header !== cronSecret) {
-        return new Response("Unauthorised", { status: 401, headers: corsHeaders });
-      }
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY");
+    const cronHeader = req.headers.get("x-cron-secret");
+    const authHeader = req.headers.get("authorization")?.replace("Bearer ", "");
+
+    const hasCronAuth = cronSecret && cronHeader === cronSecret;
+    const hasKeyAuth = supabaseAnonKey && authHeader === supabaseAnonKey;
+
+    if (cronSecret && !hasCronAuth && !hasKeyAuth) {
+      return new Response("Unauthorised", { status: 401, headers: corsHeaders });
     }
 
     const agents = await getAgents();
