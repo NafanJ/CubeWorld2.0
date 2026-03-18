@@ -370,19 +370,19 @@ export function ChatLogTab({ agentColorMap: parentAgentColorMap }: ChatLogTabPro
   return (
     <>
       {/* Header Content */}
-      <div className="bg-gray-800 p-3 border-b-4 border-gray-700">
+      <div className="bg-indigo-50 p-3 border-b-4 border-indigo-300">
         {selectedDate && (
           <div className="mb-3 inline-block bg-indigo-700 text-indigo-100 px-3 py-1 rounded-md border-2 border-indigo-800 pixel-text text-xs">
             Viewing: {formatDateHeader(selectedDate)}
           </div>
         )}
-        
+
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-1">
             <button
               onClick={goToPreviousDay}
               disabled={!canGoBack}
-              className="px-2 py-1 bg-gray-700 text-gray-200 border-2 border-gray-600 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-600 text-xs"
+              className="px-2 py-1 bg-indigo-600 text-white border-2 border-indigo-800 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-indigo-700 text-xs"
               title="View previous day"
             >
               ← Prev
@@ -390,7 +390,7 @@ export function ChatLogTab({ agentColorMap: parentAgentColorMap }: ChatLogTabPro
             <button
               onClick={goToToday}
               disabled={isToday}
-              className="px-2 py-1 bg-gray-700 text-gray-200 border-2 border-gray-600 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-600 text-xs"
+              className="px-2 py-1 bg-indigo-600 text-white border-2 border-indigo-800 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-indigo-700 text-xs"
               title="Jump to today"
             >
               Today
@@ -398,23 +398,23 @@ export function ChatLogTab({ agentColorMap: parentAgentColorMap }: ChatLogTabPro
             <button
               onClick={goToNextDay}
               disabled={!canGoForward}
-              className="px-2 py-1 bg-gray-700 text-gray-200 border-2 border-gray-600 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-600 text-xs"
+              className="px-2 py-1 bg-indigo-600 text-white border-2 border-indigo-800 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-indigo-700 text-xs"
               title="View next day"
             >
               Next →
             </button>
             {selectedDate && dayMessageCounts[selectedDate] !== undefined && (
-              <span className="pixel-text text-gray-400 text-xs ml-2">
+              <span className="pixel-text text-indigo-700 text-xs ml-2">
                 ({dayMessageCounts[selectedDate]} message{dayMessageCounts[selectedDate] === 1 ? '' : 's'})
               </span>
             )}
           </div>
           <div className="ml-auto">
-            <label className="pixel-text text-gray-300 text-xs mr-2">Filter:</label>
+            <label className="pixel-text text-indigo-900 text-xs mr-2">Filter:</label>
             <select
               value={selectedAgent}
               onChange={(e) => setSelectedAgent(e.target.value)}
-              className="text-xs px-2 py-1 rounded-md bg-gray-700 text-gray-200 border-2 border-gray-600"
+              className="text-xs px-2 py-1 rounded-md bg-indigo-600 text-white border-2 border-indigo-800"
             >
               <option value="all">All agents</option>
               {Object.entries(agentMap)
@@ -430,26 +430,26 @@ export function ChatLogTab({ agentColorMap: parentAgentColorMap }: ChatLogTabPro
       </div>
 
       {/* Messages Content */}
-      <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-4 space-y-2 border-b-8 border-gray-700">
+      <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-4 space-y-2 border-b-8 border-indigo-500">
         {loading && (
           <div className="space-y-2">
             {[1, 2, 3, 4, 5].map((i) => (
               <div key={i} className="flex items-center gap-3 animate-pulse">
-                <div className="w-10 h-10 rounded-lg bg-gray-700" />
+                <div className="w-10 h-10 rounded-lg bg-gray-300" />
                 <div className="flex-1 space-y-2">
-                  <div className="h-3 bg-gray-700 rounded w-1/4" />
-                  <div className="h-8 bg-gray-700 rounded w-full" />
+                  <div className="h-3 bg-gray-300 rounded w-1/4" />
+                  <div className="h-8 bg-gray-300 rounded w-full" />
                 </div>
               </div>
             ))}
           </div>
         )}
         {messages.length === 0 && !loading && (
-          <div className="text-xs text-gray-400">No messages yet.</div>
+          <div className="text-xs text-gray-500">No messages yet.</div>
         )}
 
         {messages.length > 0 && filteredMessages.length === 0 && (
-          <div className="text-xs text-gray-400">No messages on this day.</div>
+          <div className="text-xs text-gray-500">No messages on this day.</div>
         )}
 
         {filteredMessages.map((msg) => {
@@ -482,13 +482,13 @@ export function ChatLogTab({ agentColorMap: parentAgentColorMap }: ChatLogTabPro
       </div>
 
       {/* User message input */}
-      <div className="bg-gray-800 p-3 border-t-4 border-gray-700">
+      <div className="bg-indigo-50 p-3 border-t-4 border-indigo-300">
         <div className="flex items-center gap-2 mb-2">
-          <label className="pixel-text text-gray-400 text-[10px]">Room:</label>
+          <label className="pixel-text text-indigo-700 text-[10px]">Room:</label>
           <select
             value={selectedRoom}
             onChange={(e) => setSelectedRoom(e.target.value)}
-            className="text-xs px-2 py-1 rounded-md bg-gray-700 text-gray-200 border-2 border-gray-600 flex-1"
+            className="text-xs px-2 py-1 rounded-md bg-white text-gray-800 border-2 border-indigo-300 flex-1"
           >
             {rooms.map((room) => (
               <option key={room.id} value={room.id}>
@@ -509,14 +509,14 @@ export function ChatLogTab({ agentColorMap: parentAgentColorMap }: ChatLogTabPro
               }
             }}
             placeholder="Say something to the villagers..."
-            className="flex-1 px-3 py-2 bg-gray-700 text-gray-200 border-2 border-gray-600 rounded-md pixel-text text-xs placeholder-gray-500 focus:outline-none focus:border-indigo-500"
+            className="flex-1 px-3 py-2 bg-white text-gray-800 border-2 border-indigo-300 rounded-md pixel-text text-xs placeholder-gray-400 focus:outline-none focus:border-indigo-500"
             disabled={sending}
             maxLength={200}
           />
           <button
             onClick={handleSendMessage}
             disabled={!userInput.trim() || sending}
-            className="px-4 py-2 bg-indigo-600 text-white rounded-md pixel-text text-xs font-bold border-2 border-indigo-800 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="px-4 py-2 bg-indigo-600 text-white rounded-md pixel-text text-xs font-bold border-2 border-indigo-800 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             SEND
           </button>

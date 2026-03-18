@@ -129,13 +129,13 @@ export function StatusTab({ agentColorMap }: StatusTabProps) {
     return (
       <div className="flex-1 overflow-y-auto p-4 space-y-3">
         {[1, 2, 3, 4, 5, 6].map((i) => (
-          <div key={i} className="bg-gray-800 border-4 border-gray-700 rounded-lg p-3 pixel-border-sm animate-pulse">
+          <div key={i} className="bg-gray-200 border-4 border-gray-300 rounded-lg p-3 pixel-border-sm animate-pulse">
             <div className="flex items-start gap-3">
-              <div className="w-12 h-12 rounded-full bg-gray-700" />
+              <div className="w-12 h-12 rounded-full bg-gray-300" />
               <div className="flex-1 space-y-2">
-                <div className="h-4 bg-gray-700 rounded w-1/3" />
-                <div className="h-3 bg-gray-700 rounded w-full" />
-                <div className="h-3 bg-gray-700 rounded w-2/3" />
+                <div className="h-4 bg-gray-300 rounded w-1/3" />
+                <div className="h-3 bg-gray-300 rounded w-full" />
+                <div className="h-3 bg-gray-300 rounded w-2/3" />
               </div>
             </div>
           </div>
@@ -147,7 +147,7 @@ export function StatusTab({ agentColorMap }: StatusTabProps) {
   return (
     <div className="flex-1 overflow-y-auto p-4 space-y-3">
       {agents.length === 0 ? (
-        <div className="text-xs text-gray-400">No agents yet.</div>
+        <div className="text-xs text-gray-500">No agents yet.</div>
       ) : (
         agents.map((agent) => {
           const color = agentColorMap[agent.id] || 'slate';
@@ -157,7 +157,7 @@ export function StatusTab({ agentColorMap }: StatusTabProps) {
           return (
             <div
               key={agent.id}
-              className="bg-gray-800 border-4 border-gray-600 rounded-lg p-3 pixel-border-sm animate-slide-in"
+              className="bg-white border-4 border-indigo-300 rounded-lg p-3 pixel-border-sm animate-slide-in"
             >
               <div className="flex items-start gap-3">
                 {/* Agent Avatar */}
@@ -174,14 +174,14 @@ export function StatusTab({ agentColorMap }: StatusTabProps) {
                 <div className="flex-1 min-w-0">
                   {/* Agent Name and Status */}
                   <div className="flex items-center gap-2 mb-2">
-                    <h3 className="pixel-text text-sm font-bold text-gray-100 truncate">
+                    <h3 className="pixel-text text-sm font-bold text-indigo-900 truncate">
                       {agent.name}
                     </h3>
                     <span
                       className={`px-2 py-0.5 rounded text-[10px] font-bold ${
                         agent.is_active
                           ? 'bg-green-500 text-white'
-                          : 'bg-gray-600 text-gray-300'
+                          : 'bg-gray-400 text-gray-700'
                       }`}
                     >
                       {agent.is_active ? 'ACTIVE' : 'INACTIVE'}
@@ -191,10 +191,10 @@ export function StatusTab({ agentColorMap }: StatusTabProps) {
                   {/* Mood Bar */}
                   <div className="mb-2">
                     <div className="flex items-center gap-2 mb-1">
-                      <span className="text-xs font-semibold text-gray-300">Mood:</span>
-                      <span className="text-xs text-gray-400">{agent.mood} ({agent.mood <= -3 ? 'very sad' : agent.mood <= -1 ? 'sad' : agent.mood <= 1 ? 'neutral' : agent.mood <= 3 ? 'happy' : 'very happy'})</span>
+                      <span className="text-xs font-semibold text-gray-700">Mood:</span>
+                      <span className="text-xs text-gray-600">{agent.mood} ({agent.mood <= -3 ? 'very sad' : agent.mood <= -1 ? 'sad' : agent.mood <= 1 ? 'neutral' : agent.mood <= 3 ? 'happy' : 'very happy'})</span>
                     </div>
-                    <div className="w-full bg-gray-700 rounded-full h-2 border border-gray-600">
+                    <div className="w-full bg-gray-200 rounded-full h-2 border border-gray-300">
                       <div
                         className="h-full rounded-full transition-all"
                         style={{
@@ -208,17 +208,17 @@ export function StatusTab({ agentColorMap }: StatusTabProps) {
                   {/* Energy Bars */}
                   <div className="mb-2">
                     <div className="flex items-center gap-2 mb-1">
-                      <span className="text-xs font-semibold text-gray-300">Energy:</span>
-                      <span className="text-xs text-gray-400">{agent.energy}/5</span>
+                      <span className="text-xs font-semibold text-gray-700">Energy:</span>
+                      <span className="text-xs text-gray-600">{agent.energy}/5</span>
                     </div>
                     <div className="flex gap-1">
                       {[1, 2, 3, 4, 5].map((level) => (
                         <div
                           key={level}
-                          className={`flex-1 h-3 rounded border border-gray-600 ${
+                          className={`flex-1 h-3 rounded border border-gray-300 ${
                             level <= agent.energy
                               ? 'bg-yellow-400'
-                              : 'bg-gray-700'
+                              : 'bg-gray-200'
                           }`}
                         />
                       ))}
@@ -226,12 +226,12 @@ export function StatusTab({ agentColorMap }: StatusTabProps) {
                   </div>
                   
                   {/* Room Location */}
-                  <div className="text-xs text-gray-400 mb-1">
+                  <div className="text-xs text-gray-600 mb-1">
                     <span className="font-semibold">Room:</span> {roomName}
                   </div>
                   
                   {/* Provider/Model */}
-                  <div className="text-xs text-gray-400 mb-1">
+                  <div className="text-xs text-gray-600 mb-1">
                     <span className="font-semibold">Model:</span> {agent.provider}/{agent.model}
                   </div>
                   
@@ -241,7 +241,7 @@ export function StatusTab({ agentColorMap }: StatusTabProps) {
                       {traits.slice(0, 5).map((trait: string, idx: number) => (
                         <span
                           key={idx}
-                          className="px-2 py-0.5 bg-purple-900/60 text-purple-300 rounded text-[10px] border border-purple-700"
+                          className="px-2 py-0.5 bg-purple-100 text-purple-700 rounded text-[10px] border border-purple-300"
                         >
                           {trait.charAt(0).toUpperCase() + trait.slice(1)}
                         </span>

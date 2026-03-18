@@ -193,7 +193,7 @@ export function DiaryTab({ agentColorMap }: DiaryTabProps) {
   return (
     <>
       {/* Header */}
-      <div className="bg-gray-800 p-3 border-b-4 border-gray-700">
+      <div className="bg-amber-50 p-3 border-b-4 border-amber-300">
         {selectedDate && (
           <div className="mb-3 inline-block bg-amber-700 text-amber-100 px-3 py-1 rounded-md border-2 border-amber-800 pixel-text text-xs">
             Viewing: {formatDateHeader(selectedDate)}
@@ -205,36 +205,36 @@ export function DiaryTab({ agentColorMap }: DiaryTabProps) {
             <button
               onClick={goToPreviousDay}
               disabled={!canGoBack}
-              className="px-2 py-1 bg-gray-700 text-gray-200 border-2 border-gray-600 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-600 text-xs"
+              className="px-2 py-1 bg-amber-600 text-white border-2 border-amber-800 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-amber-700 text-xs"
             >
               ← Prev
             </button>
             <button
               onClick={goToToday}
               disabled={isToday}
-              className="px-2 py-1 bg-gray-700 text-gray-200 border-2 border-gray-600 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-600 text-xs"
+              className="px-2 py-1 bg-amber-600 text-white border-2 border-amber-800 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-amber-700 text-xs"
             >
               Today
             </button>
             <button
               onClick={goToNextDay}
               disabled={!canGoForward}
-              className="px-2 py-1 bg-gray-700 text-gray-200 border-2 border-gray-600 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-600 text-xs"
+              className="px-2 py-1 bg-amber-600 text-white border-2 border-amber-800 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-amber-700 text-xs"
             >
               Next →
             </button>
             {selectedDate && dayEntryCounts[selectedDate] !== undefined && (
-              <span className="pixel-text text-gray-400 text-xs ml-2">
+              <span className="pixel-text text-amber-700 text-xs ml-2">
                 ({dayEntryCounts[selectedDate]} entr{dayEntryCounts[selectedDate] === 1 ? 'y' : 'ies'})
               </span>
             )}
           </div>
           <div className="ml-auto">
-            <label className="pixel-text text-gray-300 text-xs mr-2">Filter:</label>
+            <label className="pixel-text text-amber-900 text-xs mr-2">Filter:</label>
             <select
               value={selectedAgent}
               onChange={(e) => setSelectedAgent(e.target.value)}
-              className="text-xs px-2 py-1 rounded-md bg-gray-700 text-gray-200 border-2 border-gray-600"
+              className="text-xs px-2 py-1 rounded-md bg-amber-600 text-white border-2 border-amber-800"
             >
               <option value="all">All agents</option>
               {Object.entries(agentMap)
@@ -254,13 +254,13 @@ export function DiaryTab({ agentColorMap }: DiaryTabProps) {
         {loading && (
           <div className="space-y-3">
             {[1, 2, 3].map((i) => (
-              <div key={i} className="bg-gray-800 border-4 border-gray-700 rounded-lg p-3 animate-pulse">
+              <div key={i} className="bg-amber-50 border-4 border-amber-200 rounded-lg p-3 animate-pulse">
                 <div className="flex items-start gap-3">
-                  <div className="w-10 h-10 rounded-full bg-gray-700" />
+                  <div className="w-10 h-10 rounded-full bg-amber-200" />
                   <div className="flex-1 space-y-2">
-                    <div className="h-3 bg-gray-700 rounded w-1/4" />
-                    <div className="h-4 bg-gray-700 rounded w-full" />
-                    <div className="h-4 bg-gray-700 rounded w-3/4" />
+                    <div className="h-3 bg-amber-200 rounded w-1/4" />
+                    <div className="h-4 bg-amber-200 rounded w-full" />
+                    <div className="h-4 bg-amber-200 rounded w-3/4" />
                   </div>
                 </div>
               </div>
@@ -269,11 +269,11 @@ export function DiaryTab({ agentColorMap }: DiaryTabProps) {
         )}
 
         {entries.length === 0 && !loading && (
-          <div className="text-xs text-gray-400">No diary entries yet. Agents will begin writing after a few ticks.</div>
+          <div className="text-xs text-gray-500">No diary entries yet. Agents will begin writing after a few ticks.</div>
         )}
 
         {entries.length > 0 && filteredEntries.length === 0 && !loading && (
-          <div className="text-xs text-gray-400">No diary entries on this day.</div>
+          <div className="text-xs text-gray-500">No diary entries on this day.</div>
         )}
 
         {filteredEntries.map((entry) => {
@@ -285,7 +285,7 @@ export function DiaryTab({ agentColorMap }: DiaryTabProps) {
           return (
             <div
               key={entry.id}
-              className="bg-amber-950/30 border-4 border-amber-800/50 rounded-lg p-3 pixel-border-sm animate-slide-in"
+              className="bg-amber-50 border-4 border-amber-300 rounded-lg p-3 pixel-border-sm animate-slide-in"
             >
               <div className="flex items-start gap-3">
                 {/* Agent Avatar */}
@@ -301,14 +301,14 @@ export function DiaryTab({ agentColorMap }: DiaryTabProps) {
 
                 <div className="flex-1 min-w-0">
                   <div className="flex items-baseline gap-2 mb-1">
-                    <span className="pixel-text text-xs font-bold text-amber-200">
+                    <span className="pixel-text text-xs font-bold text-amber-800">
                       {agentName}&apos;s Diary
                     </span>
-                    <span className="pixel-text text-[8px] text-gray-400">
+                    <span className="pixel-text text-[8px] text-gray-500">
                       {time}
                     </span>
                   </div>
-                  <p className="pixel-text text-xs text-gray-200 italic leading-relaxed">
+                  <p className="pixel-text text-xs text-gray-700 italic leading-relaxed">
                     {entry.text}
                   </p>
                 </div>
