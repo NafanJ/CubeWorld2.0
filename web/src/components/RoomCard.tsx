@@ -29,9 +29,9 @@ export function RoomCard({
         style={backgroundImage ? { backgroundImage: `url(${backgroundImage})`, backgroundSize: 'cover', backgroundRepeat: 'no-repeat', backgroundPosition: 'center' } : undefined}
       >
         {/* Characters (multiple avatars) */}
-        <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex items-end gap-2">
+        <div className="absolute bottom-2 lg:bottom-4 left-1/2 transform -translate-x-1/2 flex items-end gap-1 lg:gap-2">
           {characters.map((c, i) => (
-            <div key={i} className={`w-9 h-9 rounded-full border-2 bg-white flex items-center justify-center text-sm ${i > 0 ? '-ml-2' : ''}`} title={usernames[i] || ''}>
+            <div key={i} className={`w-7 h-7 lg:w-9 lg:h-9 rounded-full border-2 bg-white flex items-center justify-center text-xs lg:text-sm ${i > 0 ? '-ml-2' : ''}`} title={usernames[i] || ''}>
               {c}
             </div>
           ))}
@@ -39,8 +39,8 @@ export function RoomCard({
 
         {/* Room name label (top-left) */}
         {roomName && (
-          <div className="absolute top-2 left-2 bg-black bg-opacity-70 px-2 py-1 rounded border border-white">
-            <p className="text-white text-[8px] pixel-text">{roomName}</p>
+          <div className="absolute top-1 left-1 lg:top-2 lg:left-2 bg-black bg-opacity-70 px-1.5 py-0.5 lg:px-2 lg:py-1 rounded border border-white">
+            <p className="text-white text-[6px] lg:text-[8px] pixel-text">{roomName}</p>
           </div>
         )}
       </div>

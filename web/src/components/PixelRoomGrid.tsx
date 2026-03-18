@@ -125,13 +125,11 @@ export const PixelRoomGrid: React.FC = () => {
   // Skeleton UI while loading
   if (isLoading) {
     return (
-      <div className="grid grid-cols-7 gap-3 max-w-5xl w-full auto-rows-fr">
+      <div className="grid grid-cols-2 lg:grid-cols-7 gap-2 lg:gap-3 max-w-5xl w-full auto-rows-fr">
         {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((i) => {
-          // Columns: 3 (left apt) + 1 (elevator) + 3 (right apt) = 7
-          // Positions 2, 5, 8 are elevators (indices 1, 4, 7)
           const isElevatorPos = i === 2 || i === 5 || i === 8;
           return (
-            <div key={i} className={isElevatorPos ? 'col-span-1' : 'aspect-video col-span-3'}>
+            <div key={i} className={isElevatorPos ? 'hidden lg:block col-span-1' : 'aspect-square lg:aspect-video col-span-1 lg:col-span-3'}>
               <div className="w-full h-full bg-gray-300 rounded-lg animate-pulse" />
             </div>
           );
@@ -142,9 +140,9 @@ export const PixelRoomGrid: React.FC = () => {
 
   return (
     <>
-      <div className="grid grid-cols-7 gap-3 max-w-5xl w-full auto-rows-fr">
+      <div className="grid grid-cols-2 lg:grid-cols-7 gap-2 lg:gap-3 max-w-5xl w-full auto-rows-fr">
         {rooms.map((room) => (
-          <div key={room.id} className={room.isElevator ? 'col-span-1' : 'aspect-video col-span-3'}>
+          <div key={room.id} className={room.isElevator ? 'hidden lg:block col-span-1' : 'aspect-square lg:aspect-video col-span-1 lg:col-span-3'}>
             {room.isElevator ? (
               <ElevatorCard
                 characters={room.characters}
