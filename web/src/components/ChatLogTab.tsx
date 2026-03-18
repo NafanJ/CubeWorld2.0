@@ -279,7 +279,6 @@ export function ChatLogTab({ agentColorMap: parentAgentColorMap, agentNameMap }:
     setUserInput('');
     try {
       const mentions = parseMentions(text);
-      console.log('[ChatLogTab] Parsed mentions:', mentions, 'from agentNameMap:', agentNameMap, 'rooms:', rooms.map(r => r.name));
       const hasMentions = mentions.agents.length > 0 || mentions.rooms.length > 0;
 
       if (hasMentions) {
@@ -296,8 +295,6 @@ export function ChatLogTab({ agentColorMap: parentAgentColorMap, agentNameMap }:
             room_id: rooms.length > 0 ? rooms[0].id : null,
             from_agent: null,
           });
-        } else {
-          console.log('Reply result:', data);
         }
       } else {
         // No mentions — just insert as a regular visitor message
