@@ -56,6 +56,12 @@ interface ChatLogTabProps {
 
 type RoomInfo = { id: string; name: string };
 
+type MentionOption = {
+  label: string;
+  value: string;
+  type: 'everyone' | 'agent' | 'room';
+};
+
 export function ChatLogTab({ agentColorMap: parentAgentColorMap, agentNameMap }: ChatLogTabProps) {
   const [messages, setMessages] = useState<SupaMessage[]>([]);
   const [agentMap, setAgentMap] = useState<Record<string, string>>({});
@@ -68,6 +74,11 @@ export function ChatLogTab({ agentColorMap: parentAgentColorMap, agentNameMap }:
   const [userInput, setUserInput] = useState('');
   const [rooms, setRooms] = useState<RoomInfo[]>([]);
   const [sending, setSending] = useState(false);
+  const [showMentionMenu, setShowMentionMenu] = useState(false);
+  const [mentionQuery, setMentionQuery] = useState('');
+  const [mentionAnchorIndex, setMentionAnchorIndex] = useState(0);
+  const [selectedMentionIndex, setSelectedMentionIndex] = useState(0);
+  const inputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement | null>(null);
   const isAtBottomRef = useRef<boolean>(true);
@@ -239,8 +250,73 @@ export function ChatLogTab({ agentColorMap: parentAgentColorMap, agentNameMap }:
     return () => { mounted = false; };
   }, []);
 
+  // Build all mention options
+  const allMentionOptions: MentionOption[] = (() => {
+    const options: MentionOption[] = [
+      { label: 'Everyone', value: 'everyone', type: 'everyone' },
+    ];
+    // Agents sorted by name
+    const sortedAgents = Object.entries(agentNameMap).sort((a, b) => a[1].localeCompare(b[1]));
+    for (const [, name] of sortedAgents) {
+      options.push({ label: name, value: name.toLowerCase(), type: 'agent' });
+    }
+    // Rooms sorted by name
+    for (const room of rooms) {
+      options.push({ label: room.name, value: room.name.toLowerCase(), type: 'room' });
+    }
+    return options;
+  })();
+
+  // Filtered options based on query
+  const filteredMentionOptions = allMentionOptions.filter((opt) =>
+    opt.value.startsWith(mentionQuery.toLowerCase()) || opt.label.toLowerCase().startsWith(mentionQuery.toLowerCase())
+  );
+
+  // Handle input change — detect @ trigger
+  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    const cursorPos = e.target.selectionStart ?? val.length;
+    setUserInput(val);
+
+    // Find the last @ before cursor
+    const textBeforeCursor = val.slice(0, cursorPos);
+    const lastAtIndex = textBeforeCursor.lastIndexOf('@');
+
+    if (lastAtIndex >= 0) {
+      const query = textBeforeCursor.slice(lastAtIndex + 1);
+      // Close menu if there's a space and a completed mention before it
+      // But allow multi-word queries like "Garden N"
+      setShowMentionMenu(true);
+      setMentionQuery(query);
+      setMentionAnchorIndex(lastAtIndex);
+      setSelectedMentionIndex(0);
+    } else {
+      setShowMentionMenu(false);
+      setMentionQuery('');
+    }
+  }, []);
+
+  // Select a mention option
+  const selectMention = useCallback((option: MentionOption) => {
+    const before = userInput.slice(0, mentionAnchorIndex);
+    const after = userInput.slice(mentionAnchorIndex + 1 + mentionQuery.length);
+    const newVal = `${before}@${option.label} ${after}`;
+    setUserInput(newVal);
+    setShowMentionMenu(false);
+    setMentionQuery('');
+    // Refocus input
+    setTimeout(() => inputRef.current?.focus(), 0);
+  }, [userInput, mentionAnchorIndex, mentionQuery]);
+
   // Parse @mentions from input text
   const parseMentions = useCallback((text: string): { agents: string[]; rooms: string[] } => {
+    const lower = text.toLowerCase();
+
+    // Check for @everyone
+    if (/@everyone\b/i.test(lower)) {
+      return { agents: ['everyone'], rooms: [] };
+    }
+
     const agents: string[] = [];
     const roomMentions: string[] = [];
 
@@ -254,10 +330,7 @@ export function ChatLogTab({ agentColorMap: parentAgentColorMap, agentNameMap }:
       ...agentNames.map((n) => ({ name: n, type: 'agent' as const })),
     ].sort((a, b) => b.name.length - a.name.length);
 
-    const lower = text.toLowerCase();
-
     for (const { name, type } of allNames) {
-      // Match @name (case-insensitive), supporting multi-word names like "@Garden Nook"
       const pattern = new RegExp(`@${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
       if (pattern.test(lower)) {
         if (type === 'agent' && !agents.includes(name)) {
@@ -527,24 +600,113 @@ export function ChatLogTab({ agentColorMap: parentAgentColorMap, agentNameMap }:
       </div>
 
       {/* User message input */}
-      <div className="bg-indigo-50 p-3 border-t-4 border-indigo-300">
+      <div className="bg-indigo-50 p-3 border-t-4 border-indigo-300 relative">
         {sending && (
           <div className="pixel-text text-[10px] text-indigo-500 mb-1 animate-pulse">
             Villagers are thinking...
           </div>
         )}
+
+        {/* @mention autocomplete dropdown */}
+        {showMentionMenu && filteredMentionOptions.length > 0 && (
+          <div className="absolute bottom-full left-0 right-0 mb-1 mx-3 bg-white border-2 border-indigo-400 rounded-md shadow-lg max-h-48 overflow-y-auto z-50">
+            {filteredMentionOptions.map((option, idx) => {
+              const isSelected = idx === selectedMentionIndex;
+              let avatar = '?';
+              let avatarColor = '#64748b';
+              if (option.type === 'everyone') {
+                avatar = '*';
+                avatarColor = '#6366f1';
+              } else if (option.type === 'agent') {
+                avatar = option.label[0];
+                const agentId = Object.entries(agentNameMap).find(([, n]) => n.toLowerCase() === option.value)?.[0];
+                if (agentId && parentAgentColorMap[agentId]) {
+                  const colorName = parentAgentColorMap[agentId];
+                  const colorHex: Record<string, string> = {
+                    red: '#ef4444', orange: '#f97316', green: '#22c55e', blue: '#3b82f6',
+                    purple: '#a855f7', teal: '#14b8a6', yellow: '#eab308', pink: '#ec4899',
+                    indigo: '#6366f1', lime: '#84cc16', amber: '#f59e0b', rose: '#f43f5e',
+                    cyan: '#06b6d4', sky: '#0ea5e9', violet: '#8b5cf6', emerald: '#10b981',
+                    fuchsia: '#d946ef', slate: '#64748b',
+                  };
+                  avatarColor = colorHex[colorName] || '#64748b';
+                }
+              } else {
+                avatar = '#';
+                avatarColor = '#f59e0b';
+              }
+
+              return (
+                <div
+                  key={`${option.type}-${option.value}`}
+                  className={`flex items-center gap-2 px-3 py-2 cursor-pointer transition-colors ${
+                    isSelected ? 'bg-indigo-100' : 'hover:bg-gray-50'
+                  }`}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    selectMention(option);
+                  }}
+                  onMouseEnter={() => setSelectedMentionIndex(idx)}
+                >
+                  <div
+                    className="w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
+                    style={{ backgroundColor: avatarColor }}
+                  >
+                    {avatar}
+                  </div>
+                  <span className="pixel-text text-xs text-gray-800">{option.label}</span>
+                  <span className="pixel-text text-[8px] text-gray-400 ml-auto">
+                    {option.type === 'everyone' ? 'ALL' : option.type === 'agent' ? 'AGENT' : 'ROOM'}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
         <div className="flex gap-2">
           <input
+            ref={inputRef}
             type="text"
             value={userInput}
-            onChange={(e) => setUserInput(e.target.value)}
+            onChange={handleInputChange}
             onKeyDown={(e) => {
+              if (showMentionMenu && filteredMentionOptions.length > 0) {
+                if (e.key === 'ArrowDown') {
+                  e.preventDefault();
+                  setSelectedMentionIndex((prev) =>
+                    prev < filteredMentionOptions.length - 1 ? prev + 1 : 0
+                  );
+                  return;
+                }
+                if (e.key === 'ArrowUp') {
+                  e.preventDefault();
+                  setSelectedMentionIndex((prev) =>
+                    prev > 0 ? prev - 1 : filteredMentionOptions.length - 1
+                  );
+                  return;
+                }
+                if (e.key === 'Enter' || e.key === 'Tab') {
+                  e.preventDefault();
+                  selectMention(filteredMentionOptions[selectedMentionIndex]);
+                  return;
+                }
+                if (e.key === 'Escape') {
+                  e.preventDefault();
+                  setShowMentionMenu(false);
+                  return;
+                }
+              }
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
                 handleSendMessage();
               }
             }}
-            placeholder="Say something... use @name or @room"
+            onBlur={() => {
+              // Delay to allow click on menu item
+              setTimeout(() => setShowMentionMenu(false), 150);
+            }}
+            placeholder="Say something... use @ to mention"
             className="flex-1 px-3 py-2 bg-white text-gray-800 border-2 border-indigo-300 rounded-md pixel-text text-xs placeholder-gray-400 focus:outline-none focus:border-indigo-500"
             disabled={sending}
             maxLength={200}

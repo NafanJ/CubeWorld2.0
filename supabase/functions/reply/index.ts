@@ -201,29 +201,39 @@ serve(async (req: Request) => {
       n.toLowerCase()
     );
 
-    // Direct agent mentions
-    for (const name of mentionedAgentNames) {
-      const agent = allAgents.find((a) => a.name.toLowerCase() === name);
-      if (agent && !targetAgents.find((t) => t.id === agent.id)) {
-        targetAgents.push(agent);
-      }
-    }
+    // @everyone → all active agents
+    const isEveryone = mentionedAgentNames.includes("everyone");
 
-    // Room mentions → add agents in those rooms
-    for (const roomName of mentionedRoomNames) {
-      const room = roomByName.get(roomName);
-      if (room) {
-        const agentsInRoom = allAgents.filter((a) => a.room_id === room.id);
-        for (const agent of agentsInRoom) {
-          if (!targetAgents.find((t) => t.id === agent.id)) {
-            targetAgents.push(agent);
+    if (isEveryone) {
+      for (const agent of allAgents) {
+        if (agent.is_active) targetAgents.push(agent);
+      }
+    } else {
+      // Direct agent mentions
+      for (const name of mentionedAgentNames) {
+        const agent = allAgents.find((a) => a.name.toLowerCase() === name);
+        if (agent && !targetAgents.find((t) => t.id === agent.id)) {
+          targetAgents.push(agent);
+        }
+      }
+
+      // Room mentions → add agents in those rooms
+      for (const roomName of mentionedRoomNames) {
+        const room = roomByName.get(roomName);
+        if (room) {
+          const agentsInRoom = allAgents.filter((a) => a.room_id === room.id);
+          for (const agent of agentsInRoom) {
+            if (!targetAgents.find((t) => t.id === agent.id)) {
+              targetAgents.push(agent);
+            }
           }
         }
       }
     }
 
-    // Cap at 3 agents
-    const respondingAgents = targetAgents.slice(0, 3);
+    // Cap: 6 for @everyone announcements, 3 for targeted mentions
+    const maxAgents = isEveryone ? 6 : 3;
+    const respondingAgents = targetAgents.slice(0, maxAgents);
 
     // Determine room for the user message
     let messageRoomId: string | null = null;
