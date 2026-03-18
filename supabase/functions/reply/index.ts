@@ -26,6 +26,7 @@ interface Agent {
   provider: string;
   model: string;
   room_id: string | null;
+  is_active: boolean;
   persona: Persona | null;
   mood: number;
   energy: number;
@@ -179,8 +180,7 @@ serve(async (req: Request) => {
     const [agentsRes, roomsRes] = await Promise.all([
       supabase
         .from("agents")
-        .select("id, name, provider, model, room_id, persona, mood, energy")
-        .eq("is_active", true),
+        .select("id, name, provider, model, room_id, is_active, persona, mood, energy"),
       supabase.from("rooms").select("id, name"),
     ]);
 
@@ -190,6 +190,7 @@ serve(async (req: Request) => {
     const roomByName = new Map(
       allRooms.map((r) => [r.name.toLowerCase(), r])
     );
+
 
     // Resolve mentioned agents by name (case-insensitive)
     const targetAgents: Agent[] = [];
@@ -238,12 +239,14 @@ serve(async (req: Request) => {
     }
 
     // Insert user message
-    await supabase.from("messages").insert({
+    const { error: msgErr } = await supabase.from("messages").insert({
       from_agent: null,
       room_id: messageRoomId,
       content,
-      message_type: "chat",
     });
+    if (msgErr) {
+      console.error("[reply] Error inserting user message:", JSON.stringify(msgErr));
+    }
 
     // Generate replies from each mentioned agent
     let replies = 0;
@@ -256,8 +259,7 @@ serve(async (req: Request) => {
         from_agent: agent.id,
         room_id: agent.room_id ?? messageRoomId,
         content: replyText,
-        message_type: "chat",
-      });
+        });
 
       if (insertErr) {
         console.error(`Error inserting reply from ${agent.name}:`, insertErr);
