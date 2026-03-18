@@ -42,10 +42,15 @@ function getColorValue(color: string, shade: number): string {
   return colorMap[color]?.[shade] || colorMap.slate[shade];
 }
 
-function getMoodColor(mood: number): string {
-  if (mood <= 3) return '#ef4444'; // red
-  if (mood <= 5) return '#f97316'; // orange
-  if (mood <= 7) return '#eab308'; // yellow
+// Mood is stored as -5..5 in DB, normalized to 0-10 for display
+function normalizeMood(mood: number): number {
+  return mood + 5;
+}
+
+function getMoodColor(normalizedMood: number): string {
+  if (normalizedMood <= 3) return '#ef4444'; // red
+  if (normalizedMood <= 5) return '#f97316'; // orange
+  if (normalizedMood <= 7) return '#eab308'; // yellow
   return '#22c55e'; // green
 }
 
@@ -187,14 +192,14 @@ export function StatusTab({ agentColorMap }: StatusTabProps) {
                   <div className="mb-2">
                     <div className="flex items-center gap-2 mb-1">
                       <span className="text-xs font-semibold text-gray-300">Mood:</span>
-                      <span className="text-xs text-gray-400">{agent.mood}/10</span>
+                      <span className="text-xs text-gray-400">{agent.mood} ({agent.mood <= -3 ? 'very sad' : agent.mood <= -1 ? 'sad' : agent.mood <= 1 ? 'neutral' : agent.mood <= 3 ? 'happy' : 'very happy'})</span>
                     </div>
                     <div className="w-full bg-gray-700 rounded-full h-2 border border-gray-600">
                       <div
                         className="h-full rounded-full transition-all"
                         style={{
-                          width: `${(agent.mood / 10) * 100}%`,
-                          backgroundColor: getMoodColor(agent.mood),
+                          width: `${(normalizeMood(agent.mood) / 10) * 100}%`,
+                          backgroundColor: getMoodColor(normalizeMood(agent.mood)),
                         }}
                       />
                     </div>

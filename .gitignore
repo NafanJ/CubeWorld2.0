@@ -1,4 +1,6 @@
 node_modules/
 .vscode/
+.next/
 web/.prettierrc
 supabase/.env
+web/next-env.d.ts

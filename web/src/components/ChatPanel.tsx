@@ -4,8 +4,9 @@ import { PALETTE, buildAgentColorMap } from '../lib/colorUtils';
 import { ChatLogTab } from './ChatLogTab';
 import { StatusTab } from './StatusTab';
 import { SystemTab } from './SystemTab';
+import { DiaryTab } from './DiaryTab';
 
-type TabType = 'chat' | 'status' | 'system';
+type TabType = 'chat' | 'status' | 'diary' | 'system';
 
 export function ChatPanel() {
   const [activeTab, setActiveTab] = useState<TabType>('chat');
@@ -88,6 +89,16 @@ export function ChatPanel() {
             STATUS
           </button>
           <button
+            onClick={() => setActiveTab('diary')}
+            className={`px-4 py-2 rounded-md pixel-text text-xs font-bold transition-colors ${
+              activeTab === 'diary'
+                ? 'bg-amber-600 text-white border-2 border-amber-800'
+                : 'bg-gray-700 text-gray-300 border-2 border-gray-600 hover:bg-gray-600'
+            }`}
+          >
+            DIARY
+          </button>
+          <button
             onClick={() => setActiveTab('system')}
             className={`px-4 py-2 rounded-md pixel-text text-xs font-bold transition-colors ${
               activeTab === 'system'
@@ -103,7 +114,12 @@ export function ChatPanel() {
         {activeTab === 'status' && (
           <h2 className="pixel-text text-white text-lg font-bold">AGENT STATUS</h2>
         )}
-        
+
+        {/* Diary Tab Header */}
+        {activeTab === 'diary' && (
+          <h2 className="pixel-text text-amber-200 text-lg font-bold">AGENT DIARIES</h2>
+        )}
+
         {/* System Tab Header */}
         {activeTab === 'system' && (
           <h2 className="pixel-text text-white text-lg font-bold">SYSTEM</h2>
@@ -116,6 +132,9 @@ export function ChatPanel() {
       </div>
       <div style={{ display: activeTab === 'status' ? 'flex' : 'none' }} className="flex-1 min-h-0 flex flex-col">
         <StatusTab agentColorMap={agentColorMap} />
+      </div>
+      <div style={{ display: activeTab === 'diary' ? 'flex' : 'none' }} className="flex-1 min-h-0 flex flex-col">
+        <DiaryTab agentColorMap={agentColorMap} />
       </div>
       <div style={{ display: activeTab === 'system' ? 'flex' : 'none' }} className="flex-1 min-h-0 flex flex-col">
         <SystemTab />

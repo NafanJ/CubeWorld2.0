@@ -53,6 +53,8 @@ interface ChatLogTabProps {
   agentColorMap: Record<string, string>;
 }
 
+type RoomInfo = { id: string; name: string };
+
 export function ChatLogTab({ agentColorMap: parentAgentColorMap }: ChatLogTabProps) {
   const [messages, setMessages] = useState<SupaMessage[]>([]);
   const [agentMap, setAgentMap] = useState<Record<string, string>>({});
@@ -62,6 +64,10 @@ export function ChatLogTab({ agentColorMap: parentAgentColorMap }: ChatLogTabPro
   const [selectedDate, setSelectedDate] = useState<string>('');
   const [availableDates, setAvailableDates] = useState<string[]>([]);
   const [dayMessageCounts, setDayMessageCounts] = useState<Record<string, number>>({});
+  const [userInput, setUserInput] = useState('');
+  const [rooms, setRooms] = useState<RoomInfo[]>([]);
+  const [selectedRoom, setSelectedRoom] = useState<string>('');
+  const [sending, setSending] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement | null>(null);
   const isAtBottomRef = useRef<boolean>(true);
@@ -215,6 +221,51 @@ export function ChatLogTab({ agentColorMap: parentAgentColorMap }: ChatLogTabPro
       void supabase.removeChannel(channel);
     };
   }, []);
+
+  // Load rooms for the room picker
+  useEffect(() => {
+    let mounted = true;
+    const loadRooms = async () => {
+      const { data, error } = await supabase
+        .from('rooms')
+        .select('id, name')
+        .order('name', { ascending: true });
+      if (error || !mounted || !data) return;
+
+      const roomList = (data as RoomInfo[]).filter((r) => !r.name.startsWith('Elevator'));
+      setRooms(roomList);
+      // Default to "Square" if available, otherwise first room
+      const square = roomList.find((r) => r.name === 'Square');
+      if (square) {
+        setSelectedRoom(square.id);
+      } else if (roomList.length > 0) {
+        setSelectedRoom(roomList[0].id);
+      }
+    };
+    loadRooms();
+    return () => { mounted = false; };
+  }, []);
+
+  const handleSendMessage = async () => {
+    const text = userInput.trim();
+    if (!text || !selectedRoom || sending) return;
+
+    setSending(true);
+    try {
+      const { error } = await supabase.from('messages').insert({
+        content: text,
+        room_id: selectedRoom,
+        from_agent: null,
+      });
+      if (error) {
+        console.error('Error sending message:', error);
+      } else {
+        setUserInput('');
+      }
+    } finally {
+      setSending(false);
+    }
+  };
 
   useEffect(() => {
     const channel = supabase
@@ -402,12 +453,15 @@ export function ChatLogTab({ agentColorMap: parentAgentColorMap }: ChatLogTabPro
         )}
 
         {filteredMessages.map((msg) => {
+          const isVisitor = !msg.from_agent;
           const raw = msg.from_agent || '';
-          const username = (raw && agentMap[raw]) || raw || 'Anon';
-          const avatar = username ? username[0] : '🙂';
+          const username = isVisitor ? 'Visitor' : ((raw && agentMap[raw]) || raw || 'Anon');
+          const avatar = isVisitor ? '👤' : (username ? username[0] : '🙂');
           const time = formatTime(msg.ts);
           let color = 'slate';
-          if (msg.from_agent && agentColorMap[msg.from_agent]) {
+          if (isVisitor) {
+            color = 'slate';
+          } else if (msg.from_agent && agentColorMap[msg.from_agent]) {
             color = agentColorMap[msg.from_agent];
           } else {
             color = PALETTE[Math.abs(hashString(username)) % PALETTE.length];
@@ -425,6 +479,48 @@ export function ChatLogTab({ agentColorMap: parentAgentColorMap }: ChatLogTabPro
           );
         })}
         <div ref={messagesEndRef} />
+      </div>
+
+      {/* User message input */}
+      <div className="bg-gray-800 p-3 border-t-4 border-gray-700">
+        <div className="flex items-center gap-2 mb-2">
+          <label className="pixel-text text-gray-400 text-[10px]">Room:</label>
+          <select
+            value={selectedRoom}
+            onChange={(e) => setSelectedRoom(e.target.value)}
+            className="text-xs px-2 py-1 rounded-md bg-gray-700 text-gray-200 border-2 border-gray-600 flex-1"
+          >
+            {rooms.map((room) => (
+              <option key={room.id} value={room.id}>
+                {room.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={userInput}
+            onChange={(e) => setUserInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                handleSendMessage();
+              }
+            }}
+            placeholder="Say something to the villagers..."
+            className="flex-1 px-3 py-2 bg-gray-700 text-gray-200 border-2 border-gray-600 rounded-md pixel-text text-xs placeholder-gray-500 focus:outline-none focus:border-indigo-500"
+            disabled={sending}
+            maxLength={200}
+          />
+          <button
+            onClick={handleSendMessage}
+            disabled={!userInput.trim() || sending}
+            className="px-4 py-2 bg-indigo-600 text-white rounded-md pixel-text text-xs font-bold border-2 border-indigo-800 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            SEND
+          </button>
+        </div>
       </div>
 
       {/* New-message indicator */}
