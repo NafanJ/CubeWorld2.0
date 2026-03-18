@@ -51,11 +51,12 @@ function hashString(s: string) {
 
 interface ChatLogTabProps {
   agentColorMap: Record<string, string>;
+  agentNameMap: Record<string, string>;
 }
 
 type RoomInfo = { id: string; name: string };
 
-export function ChatLogTab({ agentColorMap: parentAgentColorMap }: ChatLogTabProps) {
+export function ChatLogTab({ agentColorMap: parentAgentColorMap, agentNameMap }: ChatLogTabProps) {
   const [messages, setMessages] = useState<SupaMessage[]>([]);
   const [agentMap, setAgentMap] = useState<Record<string, string>>({});
   const [selectedAgent, setSelectedAgent] = useState<string>('all');
@@ -66,7 +67,6 @@ export function ChatLogTab({ agentColorMap: parentAgentColorMap }: ChatLogTabPro
   const [dayMessageCounts, setDayMessageCounts] = useState<Record<string, number>>({});
   const [userInput, setUserInput] = useState('');
   const [rooms, setRooms] = useState<RoomInfo[]>([]);
-  const [selectedRoom, setSelectedRoom] = useState<string>('');
   const [sending, setSending] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement | null>(null);
@@ -222,7 +222,7 @@ export function ChatLogTab({ agentColorMap: parentAgentColorMap }: ChatLogTabPro
     };
   }, []);
 
-  // Load rooms for the room picker
+  // Load rooms for @room mentions
   useEffect(() => {
     let mounted = true;
     const loadRooms = async () => {
@@ -234,33 +234,74 @@ export function ChatLogTab({ agentColorMap: parentAgentColorMap }: ChatLogTabPro
 
       const roomList = (data as RoomInfo[]).filter((r) => !r.name.startsWith('Elevator'));
       setRooms(roomList);
-      // Default to "Square" if available, otherwise first room
-      const square = roomList.find((r) => r.name === 'Square');
-      if (square) {
-        setSelectedRoom(square.id);
-      } else if (roomList.length > 0) {
-        setSelectedRoom(roomList[0].id);
-      }
     };
     loadRooms();
     return () => { mounted = false; };
   }, []);
 
+  // Parse @mentions from input text
+  const parseMentions = useCallback((text: string): { agents: string[]; rooms: string[] } => {
+    const agents: string[] = [];
+    const roomMentions: string[] = [];
+
+    // Build lookup maps
+    const agentNames = Object.values(agentNameMap).map((n) => n.toLowerCase());
+    const roomNames = rooms.map((r) => r.name.toLowerCase());
+
+    // Sort by length descending so "Garden Nook" matches before "Garden"
+    const allNames = [
+      ...roomNames.map((n) => ({ name: n, type: 'room' as const })),
+      ...agentNames.map((n) => ({ name: n, type: 'agent' as const })),
+    ].sort((a, b) => b.name.length - a.name.length);
+
+    const lower = text.toLowerCase();
+
+    for (const { name, type } of allNames) {
+      // Match @name (case-insensitive), supporting multi-word names like "@Garden Nook"
+      const pattern = new RegExp(`@${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
+      if (pattern.test(lower)) {
+        if (type === 'agent' && !agents.includes(name)) {
+          agents.push(name);
+        } else if (type === 'room' && !roomMentions.includes(name)) {
+          roomMentions.push(name);
+        }
+      }
+    }
+
+    return { agents, rooms: roomMentions };
+  }, [agentNameMap, rooms]);
+
   const handleSendMessage = async () => {
     const text = userInput.trim();
-    if (!text || !selectedRoom || sending) return;
+    if (!text || sending) return;
 
     setSending(true);
     try {
-      const { error } = await supabase.from('messages').insert({
-        content: text,
-        room_id: selectedRoom,
-        from_agent: null,
-      });
-      if (error) {
-        console.error('Error sending message:', error);
+      const mentions = parseMentions(text);
+      const hasMentions = mentions.agents.length > 0 || mentions.rooms.length > 0;
+
+      if (hasMentions) {
+        // Call the reply edge function for instant agent responses
+        const { error } = await supabase.functions.invoke('reply', {
+          body: { content: text, mentions },
+        });
+        if (error) {
+          console.error('Error sending message:', error);
+        } else {
+          setUserInput('');
+        }
       } else {
-        setUserInput('');
+        // No mentions — just insert as a regular visitor message
+        const { error } = await supabase.from('messages').insert({
+          content: text,
+          room_id: rooms.length > 0 ? rooms[0].id : null,
+          from_agent: null,
+        });
+        if (error) {
+          console.error('Error sending message:', error);
+        } else {
+          setUserInput('');
+        }
       }
     } finally {
       setSending(false);
@@ -483,20 +524,11 @@ export function ChatLogTab({ agentColorMap: parentAgentColorMap }: ChatLogTabPro
 
       {/* User message input */}
       <div className="bg-indigo-50 p-3 border-t-4 border-indigo-300">
-        <div className="flex items-center gap-2 mb-2">
-          <label className="pixel-text text-indigo-700 text-[10px]">Room:</label>
-          <select
-            value={selectedRoom}
-            onChange={(e) => setSelectedRoom(e.target.value)}
-            className="text-xs px-2 py-1 rounded-md bg-white text-gray-800 border-2 border-indigo-300 flex-1"
-          >
-            {rooms.map((room) => (
-              <option key={room.id} value={room.id}>
-                {room.name}
-              </option>
-            ))}
-          </select>
-        </div>
+        {sending && (
+          <div className="pixel-text text-[10px] text-indigo-500 mb-1 animate-pulse">
+            Villagers are thinking...
+          </div>
+        )}
         <div className="flex gap-2">
           <input
             type="text"
@@ -508,7 +540,7 @@ export function ChatLogTab({ agentColorMap: parentAgentColorMap }: ChatLogTabPro
                 handleSendMessage();
               }
             }}
-            placeholder="Say something to the villagers..."
+            placeholder="Say something... use @name or @room"
             className="flex-1 px-3 py-2 bg-white text-gray-800 border-2 border-indigo-300 rounded-md pixel-text text-xs placeholder-gray-400 focus:outline-none focus:border-indigo-500"
             disabled={sending}
             maxLength={200}

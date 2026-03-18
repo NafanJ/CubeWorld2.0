@@ -11,6 +11,7 @@ type TabType = 'chat' | 'status' | 'diary' | 'system';
 export function ChatPanel() {
   const [activeTab, setActiveTab] = useState<TabType>('chat');
   const [agentColorMap, setAgentColorMap] = useState<Record<string, string>>({});
+  const [agentNameMap, setAgentNameMap] = useState<Record<string, string>>({});
 
   // Load agents to build color map for consistency across tabs
   useEffect(() => {
@@ -26,6 +27,9 @@ export function ChatPanel() {
 
       const agents = (data as Array<{ id: string; name: string }>).filter((a) => a?.id && a?.name);
       setAgentColorMap(buildAgentColorMap(agents));
+      const nameMap: Record<string, string> = {};
+      for (const a of agents) nameMap[a.id] = a.name;
+      setAgentNameMap(nameMap);
     };
 
     loadAgents();
@@ -39,6 +43,7 @@ export function ChatPanel() {
         (payload: any) => {
           const newRow = payload.new as { id: string; name?: string } | null;
           if (newRow && newRow.id && newRow.name) {
+            setAgentNameMap((prev) => ({ ...prev, [newRow.id]: newRow.name as string }));
             setAgentColorMap((prev) => {
               if (prev[newRow.id]) return prev;
               const used = new Set(Object.values(prev));
@@ -47,6 +52,11 @@ export function ChatPanel() {
             });
           } else if (payload.event === 'DELETE' && payload.old) {
             const oldRow = payload.old as { id: string };
+            setAgentNameMap((prev) => {
+              const copy = { ...prev };
+              delete copy[oldRow.id];
+              return copy;
+            });
             setAgentColorMap((prev) => {
               const copy = { ...prev };
               delete copy[oldRow.id];
@@ -128,7 +138,7 @@ export function ChatPanel() {
 
       {/* Keep all tabs mounted but hidden to preserve state */}
       <div style={{ display: activeTab === 'chat' ? 'flex' : 'none' }} className="flex flex-col flex-1 min-h-0">
-        <ChatLogTab agentColorMap={agentColorMap} />
+        <ChatLogTab agentColorMap={agentColorMap} agentNameMap={agentNameMap} />
       </div>
       <div style={{ display: activeTab === 'status' ? 'flex' : 'none' }} className="flex-1 min-h-0 flex flex-col">
         <StatusTab agentColorMap={agentColorMap} />
