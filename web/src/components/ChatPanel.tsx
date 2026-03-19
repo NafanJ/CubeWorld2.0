@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { PALETTE, buildAgentColorMap } from '../lib/colorUtils';
 import { ChatLogTab } from './ChatLogTab';
+import { ConversationList } from './ConversationList';
 import { StatusTab } from './StatusTab';
 import { SystemTab } from './SystemTab';
 import { DiaryTab } from './DiaryTab';
@@ -17,6 +18,8 @@ export function ChatPanel({ mobileTab }: ChatPanelProps) {
   const [agentColorMap, setAgentColorMap] = useState<Record<string, string>>({});
   const [agentNameMap, setAgentNameMap] = useState<Record<string, string>>({});
   const [isMobile, setIsMobile] = useState(false);
+  // null = conversation list, 'group' = group chat thread, agentId = DM thread
+  const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
 
   useEffect(() => {
     const mq = window.matchMedia('(max-width: 1023px)');
@@ -101,8 +104,8 @@ export function ChatPanel({ mobileTab }: ChatPanelProps) {
                 : 'bg-indigo-400 text-indigo-900 border-2 border-indigo-600 hover:bg-indigo-500'
             }`}
           >
-            <span className="hidden sm:inline">CHAT LOG</span>
-            <span className="sm:hidden">CHAT</span>
+            <span className="hidden sm:inline">MESSAGES</span>
+            <span className="sm:hidden">MSG</span>
           </button>
           <button
             onClick={() => setDesktopTab('status')}
@@ -155,7 +158,21 @@ export function ChatPanel({ mobileTab }: ChatPanelProps) {
 
       {/* Keep all tabs mounted but hidden to preserve state */}
       <div style={{ display: activeTab === 'chat' ? 'flex' : 'none' }} className="flex flex-col flex-1 min-h-0">
-        <ChatLogTab agentColorMap={agentColorMap} agentNameMap={agentNameMap} />
+        {selectedConversation === null ? (
+          <ConversationList
+            agentColorMap={agentColorMap}
+            agentNameMap={agentNameMap}
+            onSelect={setSelectedConversation}
+          />
+        ) : (
+          <ChatLogTab
+            agentColorMap={agentColorMap}
+            agentNameMap={agentNameMap}
+            dmAgentId={selectedConversation === 'group' ? null : selectedConversation}
+            dmAgentName={selectedConversation === 'group' ? null : agentNameMap[selectedConversation]}
+            onBack={() => setSelectedConversation(null)}
+          />
+        )}
       </div>
       <div style={{ display: activeTab === 'status' ? 'flex' : 'none' }} className="flex-1 min-h-0 flex flex-col">
         <StatusTab agentColorMap={agentColorMap} />
