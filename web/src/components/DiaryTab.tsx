@@ -192,65 +192,116 @@ export function DiaryTab({ agentColorMap }: DiaryTabProps) {
 
   return (
     <>
-      {/* Header */}
-      <div className="bg-amber-50 p-3 border-b-4 border-amber-300">
-        {selectedDate && (
-          <div className="mb-3 inline-block bg-amber-700 text-amber-100 px-3 py-1 rounded-md border-2 border-amber-800 pixel-text text-xs">
-            Viewing: {formatDateHeader(selectedDate)}
-          </div>
-        )}
+      {/* Header - compact on mobile */}
+      <div className="bg-amber-600 lg:bg-amber-50 px-2 py-1.5 lg:p-3 border-b-2 lg:border-b-4 border-amber-700 lg:border-amber-300">
+        {/* Mobile: compact row */}
+        <div className="flex items-center gap-1.5 lg:hidden">
+          <button
+            onClick={goToPreviousDay}
+            disabled={!canGoBack}
+            className="px-1.5 py-1 bg-amber-700 text-white rounded disabled:opacity-40 text-[10px] pixel-text"
+          >
+            &lt;
+          </button>
+          <button
+            onClick={goToToday}
+            disabled={isToday}
+            className="px-1.5 py-1 bg-amber-700 text-white rounded disabled:opacity-40 text-[10px] pixel-text"
+          >
+            NOW
+          </button>
+          <button
+            onClick={goToNextDay}
+            disabled={!canGoForward}
+            className="px-1.5 py-1 bg-amber-700 text-white rounded disabled:opacity-40 text-[10px] pixel-text"
+          >
+            &gt;
+          </button>
+          {selectedDate && (
+            <span className="pixel-text text-white text-[8px] truncate">
+              {formatDateHeader(selectedDate)}
+            </span>
+          )}
+          {selectedDate && dayEntryCounts[selectedDate] !== undefined && (
+            <span className="pixel-text text-amber-200 text-[8px]">
+              ({dayEntryCounts[selectedDate]})
+            </span>
+          )}
+          <select
+            value={selectedAgent}
+            onChange={(e) => setSelectedAgent(e.target.value)}
+            className="ml-auto text-[9px] px-1.5 py-1 rounded bg-amber-700 text-white border border-amber-800 pixel-text"
+          >
+            <option value="all">All</option>
+            {Object.entries(agentMap)
+              .sort((a, b) => a[1].localeCompare(b[1]))
+              .map(([id, name]) => (
+                <option key={id} value={id}>
+                  {name}
+                </option>
+              ))}
+          </select>
+        </div>
 
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1">
-            <button
-              onClick={goToPreviousDay}
-              disabled={!canGoBack}
-              className="px-2 py-1 bg-amber-600 text-white border-2 border-amber-800 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-amber-700 text-xs"
-            >
-              ← Prev
-            </button>
-            <button
-              onClick={goToToday}
-              disabled={isToday}
-              className="px-2 py-1 bg-amber-600 text-white border-2 border-amber-800 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-amber-700 text-xs"
-            >
-              Today
-            </button>
-            <button
-              onClick={goToNextDay}
-              disabled={!canGoForward}
-              className="px-2 py-1 bg-amber-600 text-white border-2 border-amber-800 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-amber-700 text-xs"
-            >
-              Next →
-            </button>
-            {selectedDate && dayEntryCounts[selectedDate] !== undefined && (
-              <span className="pixel-text text-amber-700 text-xs ml-2">
-                ({dayEntryCounts[selectedDate]} entr{dayEntryCounts[selectedDate] === 1 ? 'y' : 'ies'})
-              </span>
-            )}
-          </div>
-          <div className="ml-auto">
-            <label className="pixel-text text-amber-900 text-xs mr-2">Filter:</label>
-            <select
-              value={selectedAgent}
-              onChange={(e) => setSelectedAgent(e.target.value)}
-              className="text-xs px-2 py-1 rounded-md bg-amber-600 text-white border-2 border-amber-800"
-            >
-              <option value="all">All agents</option>
-              {Object.entries(agentMap)
-                .sort((a, b) => a[1].localeCompare(b[1]))
-                .map(([id, name]) => (
-                  <option key={id} value={id}>
-                    {name}
-                  </option>
-                ))}
-            </select>
+        {/* Desktop: original layout */}
+        <div className="hidden lg:block">
+          {selectedDate && (
+            <div className="mb-3 inline-block bg-amber-700 text-amber-100 px-3 py-1 rounded-md border-2 border-amber-800 pixel-text text-xs">
+              Viewing: {formatDateHeader(selectedDate)}
+            </div>
+          )}
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1">
+              <button
+                onClick={goToPreviousDay}
+                disabled={!canGoBack}
+                className="px-2 py-1 bg-amber-600 text-white border-2 border-amber-800 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-amber-700 text-xs"
+              >
+                &larr; Prev
+              </button>
+              <button
+                onClick={goToToday}
+                disabled={isToday}
+                className="px-2 py-1 bg-amber-600 text-white border-2 border-amber-800 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-amber-700 text-xs"
+              >
+                Today
+              </button>
+              <button
+                onClick={goToNextDay}
+                disabled={!canGoForward}
+                className="px-2 py-1 bg-amber-600 text-white border-2 border-amber-800 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-amber-700 text-xs"
+              >
+                Next &rarr;
+              </button>
+              {selectedDate && dayEntryCounts[selectedDate] !== undefined && (
+                <span className="pixel-text text-amber-700 text-xs ml-2">
+                  ({dayEntryCounts[selectedDate]} entr{dayEntryCounts[selectedDate] === 1 ? 'y' : 'ies'})
+                </span>
+              )}
+            </div>
+            <div className="ml-auto">
+              <label className="pixel-text text-amber-900 text-xs mr-2">Filter:</label>
+              <select
+                value={selectedAgent}
+                onChange={(e) => setSelectedAgent(e.target.value)}
+                className="text-xs px-2 py-1 rounded-md bg-amber-600 text-white border-2 border-amber-800"
+              >
+                <option value="all">All agents</option>
+                {Object.entries(agentMap)
+                  .sort((a, b) => a[1].localeCompare(b[1]))
+                  .map(([id, name]) => (
+                    <option key={id} value={id}>
+                      {name}
+                    </option>
+                  ))}
+              </select>
+            </div>
           </div>
         </div>
       </div>
 
       {/* Diary Entries */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-3">
+      <div className="flex-1 overflow-y-auto p-2 lg:p-4 space-y-2 lg:space-y-3">
         {loading && (
           <div className="space-y-3">
             {[1, 2, 3].map((i) => (
@@ -285,12 +336,12 @@ export function DiaryTab({ agentColorMap }: DiaryTabProps) {
           return (
             <div
               key={entry.id}
-              className="bg-amber-50 border-4 border-amber-300 rounded-lg p-3 pixel-border-sm animate-slide-in"
+              className="bg-amber-50 border-2 lg:border-4 border-amber-300 rounded-lg p-2 lg:p-3 pixel-border-sm animate-slide-in"
             >
-              <div className="flex items-start gap-3">
+              <div className="flex items-start gap-2 lg:gap-3">
                 {/* Agent Avatar */}
                 <div
-                  className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-lg flex-shrink-0 border-2"
+                  className="w-8 h-8 lg:w-10 lg:h-10 rounded-full flex items-center justify-center text-white font-bold text-sm lg:text-lg flex-shrink-0 border-2"
                   style={{
                     backgroundColor: getColorValue(color, 500),
                     borderColor: getColorValue(color, 700),
@@ -300,15 +351,15 @@ export function DiaryTab({ agentColorMap }: DiaryTabProps) {
                 </div>
 
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-baseline gap-2 mb-1">
-                    <span className="pixel-text text-xs font-bold text-amber-800">
+                  <div className="flex items-baseline gap-1.5 lg:gap-2 mb-0.5 lg:mb-1">
+                    <span className="pixel-text text-[10px] lg:text-xs font-bold text-amber-800">
                       {agentName}&apos;s Diary
                     </span>
-                    <span className="pixel-text text-[8px] text-gray-500">
+                    <span className="pixel-text text-[7px] lg:text-[8px] text-gray-500">
                       {time}
                     </span>
                   </div>
-                  <p className="pixel-text text-xs text-gray-700 italic leading-relaxed">
+                  <p className="pixel-text text-[9px] lg:text-xs text-gray-700 italic leading-relaxed">
                     {entry.text}
                   </p>
                 </div>

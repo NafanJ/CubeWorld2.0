@@ -145,7 +145,12 @@ export function StatusTab({ agentColorMap }: StatusTabProps) {
   }
 
   return (
-    <div className="flex-1 overflow-y-auto p-4 space-y-3">
+    <div className="flex-1 overflow-y-auto p-2 lg:p-4 space-y-2 lg:space-y-3">
+      {/* Mobile header */}
+      <div className="lg:hidden bg-indigo-500 -mx-2 -mt-2 px-3 py-2 mb-2">
+        <h2 className="pixel-text text-white text-xs font-bold">AGENT STATUS</h2>
+      </div>
+
       {agents.length === 0 ? (
         <div className="text-xs text-gray-500">No agents yet.</div>
       ) : (
@@ -153,16 +158,16 @@ export function StatusTab({ agentColorMap }: StatusTabProps) {
           const color = agentColorMap[agent.id] || 'slate';
           const roomName = agent.room_id ? rooms[agent.room_id] || 'Unknown' : 'No room';
           const traits = agent.persona?.traits || [];
-          
+
           return (
             <div
               key={agent.id}
-              className="bg-white border-4 border-indigo-300 rounded-lg p-3 pixel-border-sm animate-slide-in"
+              className="bg-white border-2 lg:border-4 border-indigo-300 rounded-lg p-2 lg:p-3 pixel-border-sm animate-slide-in"
             >
-              <div className="flex items-start gap-3">
+              <div className="flex items-start gap-2 lg:gap-3">
                 {/* Agent Avatar */}
                 <div
-                  className={`w-12 h-12 rounded-full bg-${color}-500 flex items-center justify-center text-white font-bold text-lg flex-shrink-0 border-2 border-${color}-700`}
+                  className="w-10 h-10 lg:w-12 lg:h-12 rounded-full flex items-center justify-center text-white font-bold text-base lg:text-lg flex-shrink-0 border-2"
                   style={{
                     backgroundColor: getColorValue(color, 500),
                     borderColor: getColorValue(color, 700),
@@ -170,15 +175,15 @@ export function StatusTab({ agentColorMap }: StatusTabProps) {
                 >
                   {agent.name[0]}
                 </div>
-                
+
                 <div className="flex-1 min-w-0">
                   {/* Agent Name and Status */}
-                  <div className="flex items-center gap-2 mb-2">
-                    <h3 className="pixel-text text-sm font-bold text-indigo-900 truncate">
+                  <div className="flex items-center gap-2 mb-1 lg:mb-2">
+                    <h3 className="pixel-text text-[10px] lg:text-sm font-bold text-indigo-900 truncate">
                       {agent.name}
                     </h3>
                     <span
-                      className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                      className={`px-1.5 lg:px-2 py-0.5 rounded text-[8px] lg:text-[10px] font-bold ${
                         agent.is_active
                           ? 'bg-green-500 text-white'
                           : 'bg-gray-400 text-gray-700'
@@ -187,61 +192,61 @@ export function StatusTab({ agentColorMap }: StatusTabProps) {
                       {agent.is_active ? 'ACTIVE' : 'INACTIVE'}
                     </span>
                   </div>
-                  
-                  {/* Mood Bar */}
-                  <div className="mb-2">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-xs font-semibold text-gray-700">Mood:</span>
-                      <span className="text-xs text-gray-600">{agent.mood} ({agent.mood <= -3 ? 'very sad' : agent.mood <= -1 ? 'sad' : agent.mood <= 1 ? 'neutral' : agent.mood <= 3 ? 'happy' : 'very happy'})</span>
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2 border border-gray-300">
-                      <div
-                        className="h-full rounded-full transition-all"
-                        style={{
-                          width: `${(normalizeMood(agent.mood) / 10) * 100}%`,
-                          backgroundColor: getMoodColor(normalizeMood(agent.mood)),
-                        }}
-                      />
-                    </div>
-                  </div>
-                  
-                  {/* Energy Bars */}
-                  <div className="mb-2">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-xs font-semibold text-gray-700">Energy:</span>
-                      <span className="text-xs text-gray-600">{agent.energy}/5</span>
-                    </div>
-                    <div className="flex gap-1">
-                      {[1, 2, 3, 4, 5].map((level) => (
+
+                  {/* Mood + Energy inline on mobile */}
+                  <div className="flex gap-3 lg:block mb-1 lg:mb-0">
+                    {/* Mood Bar */}
+                    <div className="flex-1 mb-0 lg:mb-2">
+                      <div className="flex items-center gap-1 lg:gap-2 mb-0.5 lg:mb-1">
+                        <span className="text-[10px] lg:text-xs font-semibold text-gray-700">Mood</span>
+                        <span className="text-[9px] lg:text-xs text-gray-500">{agent.mood}</span>
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-1.5 lg:h-2 border border-gray-300">
                         <div
-                          key={level}
-                          className={`flex-1 h-3 rounded border border-gray-300 ${
-                            level <= agent.energy
-                              ? 'bg-yellow-400'
-                              : 'bg-gray-200'
-                          }`}
+                          className="h-full rounded-full transition-all"
+                          style={{
+                            width: `${(normalizeMood(agent.mood) / 10) * 100}%`,
+                            backgroundColor: getMoodColor(normalizeMood(agent.mood)),
+                          }}
                         />
-                      ))}
+                      </div>
+                    </div>
+
+                    {/* Energy Bars */}
+                    <div className="flex-1 mb-0 lg:mb-2">
+                      <div className="flex items-center gap-1 lg:gap-2 mb-0.5 lg:mb-1">
+                        <span className="text-[10px] lg:text-xs font-semibold text-gray-700">Energy</span>
+                        <span className="text-[9px] lg:text-xs text-gray-500">{agent.energy}/5</span>
+                      </div>
+                      <div className="flex gap-0.5 lg:gap-1">
+                        {[1, 2, 3, 4, 5].map((level) => (
+                          <div
+                            key={level}
+                            className={`flex-1 h-1.5 lg:h-3 rounded border border-gray-300 ${
+                              level <= agent.energy
+                                ? 'bg-yellow-400'
+                                : 'bg-gray-200'
+                            }`}
+                          />
+                        ))}
+                      </div>
                     </div>
                   </div>
-                  
-                  {/* Room Location */}
-                  <div className="text-xs text-gray-600 mb-1">
-                    <span className="font-semibold">Room:</span> {roomName}
+
+                  {/* Room + Model inline on mobile */}
+                  <div className="flex gap-2 lg:block text-[9px] lg:text-xs text-gray-600 mb-1">
+                    <span><span className="font-semibold">Room:</span> {roomName}</span>
+                    <span className="hidden lg:block"><span className="font-semibold">Model:</span> {agent.provider}/{agent.model}</span>
+                    <span className="lg:hidden text-gray-400">{agent.provider}/{agent.model}</span>
                   </div>
-                  
-                  {/* Provider/Model */}
-                  <div className="text-xs text-gray-600 mb-1">
-                    <span className="font-semibold">Model:</span> {agent.provider}/{agent.model}
-                  </div>
-                  
+
                   {/* Traits */}
                   {traits.length > 0 && (
-                    <div className="flex flex-wrap gap-1 mt-2">
+                    <div className="flex flex-wrap gap-1 mt-1 lg:mt-2">
                       {traits.slice(0, 5).map((trait: string, idx: number) => (
                         <span
                           key={idx}
-                          className="px-2 py-0.5 bg-purple-100 text-purple-700 rounded text-[10px] border border-purple-300"
+                          className="px-1.5 lg:px-2 py-0.5 bg-purple-100 text-purple-700 rounded text-[8px] lg:text-[10px] border border-purple-300"
                         >
                           {trait.charAt(0).toUpperCase() + trait.slice(1)}
                         </span>

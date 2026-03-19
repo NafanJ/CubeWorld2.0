@@ -487,68 +487,116 @@ export function ChatLogTab({ agentColorMap: parentAgentColorMap, agentNameMap }:
 
   return (
     <>
-      {/* Header Content */}
-      <div className="bg-indigo-50 p-3 border-b-4 border-indigo-300">
-        {selectedDate && (
-          <div className="mb-3 inline-block bg-indigo-700 text-indigo-100 px-3 py-1 rounded-md border-2 border-indigo-800 pixel-text text-xs">
-            Viewing: {formatDateHeader(selectedDate)}
-          </div>
-        )}
+      {/* Header Content - compact on mobile */}
+      <div className="bg-indigo-500 lg:bg-indigo-50 px-2 py-1.5 lg:p-3 border-b-2 lg:border-b-4 border-indigo-600 lg:border-indigo-300">
+        {/* Mobile: single compact row */}
+        <div className="flex items-center gap-1.5 lg:hidden">
+          <button
+            onClick={goToPreviousDay}
+            disabled={!canGoBack}
+            className="px-1.5 py-1 bg-indigo-700 text-white rounded disabled:opacity-40 text-[10px] pixel-text"
+          >
+            &lt;
+          </button>
+          <button
+            onClick={goToToday}
+            disabled={isToday}
+            className="px-1.5 py-1 bg-indigo-700 text-white rounded disabled:opacity-40 text-[10px] pixel-text"
+          >
+            NOW
+          </button>
+          <button
+            onClick={goToNextDay}
+            disabled={!canGoForward}
+            className="px-1.5 py-1 bg-indigo-700 text-white rounded disabled:opacity-40 text-[10px] pixel-text"
+          >
+            &gt;
+          </button>
+          {selectedDate && (
+            <span className="pixel-text text-white text-[8px] truncate">
+              {formatDateHeader(selectedDate)}
+            </span>
+          )}
+          {selectedDate && dayMessageCounts[selectedDate] !== undefined && (
+            <span className="pixel-text text-indigo-200 text-[8px]">
+              ({dayMessageCounts[selectedDate]})
+            </span>
+          )}
+          <select
+            value={selectedAgent}
+            onChange={(e) => setSelectedAgent(e.target.value)}
+            className="ml-auto text-[9px] px-1.5 py-1 rounded bg-indigo-700 text-white border border-indigo-800 pixel-text"
+          >
+            <option value="all">All</option>
+            {Object.entries(agentMap)
+              .sort((a, b) => a[1].localeCompare(b[1]))
+              .map(([id, name]) => (
+                <option key={id} value={id}>
+                  {name}
+                </option>
+              ))}
+          </select>
+        </div>
 
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1">
-            <button
-              onClick={goToPreviousDay}
-              disabled={!canGoBack}
-              className="px-2 py-1 bg-indigo-600 text-white border-2 border-indigo-800 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-indigo-700 text-xs"
-              title="View previous day"
-            >
-              ← Prev
-            </button>
-            <button
-              onClick={goToToday}
-              disabled={isToday}
-              className="px-2 py-1 bg-indigo-600 text-white border-2 border-indigo-800 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-indigo-700 text-xs"
-              title="Jump to today"
-            >
-              Today
-            </button>
-            <button
-              onClick={goToNextDay}
-              disabled={!canGoForward}
-              className="px-2 py-1 bg-indigo-600 text-white border-2 border-indigo-800 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-indigo-700 text-xs"
-              title="View next day"
-            >
-              Next →
-            </button>
-            {selectedDate && dayMessageCounts[selectedDate] !== undefined && (
-              <span className="pixel-text text-indigo-700 text-xs ml-2">
-                ({dayMessageCounts[selectedDate]} message{dayMessageCounts[selectedDate] === 1 ? '' : 's'})
-              </span>
-            )}
-          </div>
-          <div className="ml-auto">
-            <label className="pixel-text text-indigo-900 text-xs mr-2">Filter:</label>
-            <select
-              value={selectedAgent}
-              onChange={(e) => setSelectedAgent(e.target.value)}
-              className="text-xs px-2 py-1 rounded-md bg-indigo-600 text-white border-2 border-indigo-800"
-            >
-              <option value="all">All agents</option>
-              {Object.entries(agentMap)
-                .sort((a, b) => a[1].localeCompare(b[1]))
-                .map(([id, name]) => (
-                  <option key={id} value={id}>
-                    {name}
-                  </option>
-                ))}
-            </select>
+        {/* Desktop: original layout */}
+        <div className="hidden lg:block">
+          {selectedDate && (
+            <div className="mb-3 inline-block bg-indigo-700 text-indigo-100 px-3 py-1 rounded-md border-2 border-indigo-800 pixel-text text-xs">
+              Viewing: {formatDateHeader(selectedDate)}
+            </div>
+          )}
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1">
+              <button
+                onClick={goToPreviousDay}
+                disabled={!canGoBack}
+                className="px-2 py-1 bg-indigo-600 text-white border-2 border-indigo-800 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-indigo-700 text-xs"
+              >
+                &larr; Prev
+              </button>
+              <button
+                onClick={goToToday}
+                disabled={isToday}
+                className="px-2 py-1 bg-indigo-600 text-white border-2 border-indigo-800 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-indigo-700 text-xs"
+              >
+                Today
+              </button>
+              <button
+                onClick={goToNextDay}
+                disabled={!canGoForward}
+                className="px-2 py-1 bg-indigo-600 text-white border-2 border-indigo-800 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-indigo-700 text-xs"
+              >
+                Next &rarr;
+              </button>
+              {selectedDate && dayMessageCounts[selectedDate] !== undefined && (
+                <span className="pixel-text text-indigo-700 text-xs ml-2">
+                  ({dayMessageCounts[selectedDate]} message{dayMessageCounts[selectedDate] === 1 ? '' : 's'})
+                </span>
+              )}
+            </div>
+            <div className="ml-auto">
+              <label className="pixel-text text-indigo-900 text-xs mr-2">Filter:</label>
+              <select
+                value={selectedAgent}
+                onChange={(e) => setSelectedAgent(e.target.value)}
+                className="text-xs px-2 py-1 rounded-md bg-indigo-600 text-white border-2 border-indigo-800"
+              >
+                <option value="all">All agents</option>
+                {Object.entries(agentMap)
+                  .sort((a, b) => a[1].localeCompare(b[1]))
+                  .map(([id, name]) => (
+                    <option key={id} value={id}>
+                      {name}
+                    </option>
+                  ))}
+              </select>
+            </div>
           </div>
         </div>
       </div>
 
       {/* Messages Content */}
-      <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-4 space-y-2 border-b-8 border-indigo-500">
+      <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-2 lg:p-4 space-y-1.5 lg:space-y-2 border-b-4 lg:border-b-8 border-indigo-400 lg:border-indigo-500">
         {loading && (
           <div className="space-y-2">
             {[1, 2, 3, 4, 5].map((i) => (
@@ -600,7 +648,7 @@ export function ChatLogTab({ agentColorMap: parentAgentColorMap, agentNameMap }:
       </div>
 
       {/* User message input */}
-      <div className="bg-indigo-50 p-3 border-t-4 border-indigo-300 relative">
+      <div className="bg-indigo-50 p-2 lg:p-3 border-t-2 lg:border-t-4 border-indigo-300 relative">
         {sending && (
           <div className="pixel-text text-[10px] text-indigo-500 mb-1 animate-pulse">
             Villagers are thinking...

@@ -8,10 +8,25 @@ import { DiaryTab } from './DiaryTab';
 
 type TabType = 'chat' | 'status' | 'diary' | 'system';
 
-export function ChatPanel() {
-  const [activeTab, setActiveTab] = useState<TabType>('chat');
+interface ChatPanelProps {
+  mobileTab?: 'chat' | 'diary' | 'status';
+}
+
+export function ChatPanel({ mobileTab }: ChatPanelProps) {
+  const [desktopTab, setDesktopTab] = useState<TabType>('chat');
   const [agentColorMap, setAgentColorMap] = useState<Record<string, string>>({});
   const [agentNameMap, setAgentNameMap] = useState<Record<string, string>>({});
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 1023px)');
+    setIsMobile(mq.matches);
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, []);
+
+  const activeTab = isMobile ? (mobileTab || 'chat') : desktopTab;
 
   // Load agents to build color map for consistency across tabs
   useEffect(() => {
@@ -74,14 +89,14 @@ export function ChatPanel() {
   }, []);
 
   return (
-    <div className="relative flex flex-col h-full bg-gradient-to-br from-indigo-100 to-purple-100 border-l-8 border-indigo-500">
-      {/* Tab Navigation Header */}
-      <div className="bg-indigo-500 border-b-8 border-indigo-700 p-4 pixel-border-bottom">
+    <div className="relative flex flex-col h-full bg-gradient-to-br from-indigo-100 to-purple-100 lg:border-l-8 lg:border-indigo-500">
+      {/* Tab Navigation Header - desktop only */}
+      <div className="hidden lg:block bg-indigo-500 border-b-8 border-indigo-700 p-4 pixel-border-bottom">
         <div className="flex gap-2 mb-3">
           <button
-            onClick={() => setActiveTab('chat')}
+            onClick={() => setDesktopTab('chat')}
             className={`px-4 py-2 rounded-md pixel-text text-xs font-bold transition-colors ${
-              activeTab === 'chat'
+              desktopTab === 'chat'
                 ? 'bg-indigo-700 text-white border-2 border-indigo-900'
                 : 'bg-indigo-400 text-indigo-900 border-2 border-indigo-600 hover:bg-indigo-500'
             }`}
@@ -89,9 +104,9 @@ export function ChatPanel() {
             CHAT LOG
           </button>
           <button
-            onClick={() => setActiveTab('status')}
+            onClick={() => setDesktopTab('status')}
             className={`px-4 py-2 rounded-md pixel-text text-xs font-bold transition-colors ${
-              activeTab === 'status'
+              desktopTab === 'status'
                 ? 'bg-indigo-700 text-white border-2 border-indigo-900'
                 : 'bg-indigo-400 text-indigo-900 border-2 border-indigo-600 hover:bg-indigo-500'
             }`}
@@ -99,9 +114,9 @@ export function ChatPanel() {
             STATUS
           </button>
           <button
-            onClick={() => setActiveTab('diary')}
+            onClick={() => setDesktopTab('diary')}
             className={`px-4 py-2 rounded-md pixel-text text-xs font-bold transition-colors ${
-              activeTab === 'diary'
+              desktopTab === 'diary'
                 ? 'bg-amber-700 text-white border-2 border-amber-900'
                 : 'bg-indigo-400 text-indigo-900 border-2 border-indigo-600 hover:bg-indigo-500'
             }`}
@@ -109,9 +124,9 @@ export function ChatPanel() {
             DIARY
           </button>
           <button
-            onClick={() => setActiveTab('system')}
+            onClick={() => setDesktopTab('system')}
             className={`px-4 py-2 rounded-md pixel-text text-xs font-bold transition-colors ${
-              activeTab === 'system'
+              desktopTab === 'system'
                 ? 'bg-indigo-700 text-white border-2 border-indigo-900'
                 : 'bg-indigo-400 text-indigo-900 border-2 border-indigo-600 hover:bg-indigo-500'
             }`}
@@ -119,19 +134,19 @@ export function ChatPanel() {
             SYSTEM
           </button>
         </div>
-        
+
         {/* Status Tab Header */}
-        {activeTab === 'status' && (
+        {desktopTab === 'status' && (
           <h2 className="pixel-text text-white text-lg font-bold">AGENT STATUS</h2>
         )}
 
         {/* Diary Tab Header */}
-        {activeTab === 'diary' && (
+        {desktopTab === 'diary' && (
           <h2 className="pixel-text text-white text-lg font-bold">AGENT DIARIES</h2>
         )}
 
         {/* System Tab Header */}
-        {activeTab === 'system' && (
+        {desktopTab === 'system' && (
           <h2 className="pixel-text text-white text-lg font-bold">SYSTEM</h2>
         )}
       </div>
