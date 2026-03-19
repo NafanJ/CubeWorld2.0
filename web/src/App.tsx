@@ -21,7 +21,7 @@ export function App() {
     >
       {/* Room Grid */}
       <div
-        className={`w-full lg:w-3/5 flex-1 min-h-0 flex items-center justify-center p-2 lg:p-4 overflow-auto ${
+        className={`w-full lg:w-3/5 flex-1 min-h-0 flex items-start lg:items-center justify-center p-2 lg:p-4 overflow-auto pt-3 lg:pt-4 ${
           showChatPanel ? 'hidden lg:flex' : ''
         }`}
       >
@@ -38,7 +38,7 @@ export function App() {
       </div>
 
       {/* Mobile bottom navigation - pixel art themed */}
-      <nav className="lg:hidden flex-shrink-0 mobile-bottom-nav">
+      <nav className="lg:hidden flex-shrink-0 mobile-bottom-nav safe-area-inset-bottom">
         <button
           onClick={() => setMobileView('village')}
           className={`mobile-nav-btn ${mobileView === 'village' ? 'active' : ''}`}
