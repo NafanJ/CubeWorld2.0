@@ -52,6 +52,11 @@ function hashString(s: string) {
 interface ChatLogTabProps {
   agentColorMap: Record<string, string>;
   agentNameMap: Record<string, string>;
+  // DM mode: when set, shows only this agent's messages + visitor @mentions of them
+  dmAgentId?: string | null;
+  dmAgentName?: string | null;
+  // Back button handler (returns to conversation list)
+  onBack?: () => void;
 }
 
 type RoomInfo = { id: string; name: string };
@@ -62,7 +67,16 @@ type MentionOption = {
   type: 'everyone' | 'agent' | 'room';
 };
 
-export function ChatLogTab({ agentColorMap: parentAgentColorMap, agentNameMap }: ChatLogTabProps) {
+const COLOR_HEX: Record<string, string> = {
+  red: '#ef4444', orange: '#f97316', green: '#22c55e', blue: '#3b82f6',
+  purple: '#a855f7', teal: '#14b8a6', yellow: '#eab308', pink: '#ec4899',
+  indigo: '#6366f1', lime: '#84cc16', amber: '#f59e0b', rose: '#f43f5e',
+  cyan: '#06b6d4', sky: '#0ea5e9', violet: '#8b5cf6', emerald: '#10b981',
+  fuchsia: '#d946ef', slate: '#64748b',
+};
+
+export function ChatLogTab({ agentColorMap: parentAgentColorMap, agentNameMap, dmAgentId, dmAgentName, onBack }: ChatLogTabProps) {
+  const isDM = Boolean(dmAgentId);
   const [messages, setMessages] = useState<SupaMessage[]>([]);
   const [agentMap, setAgentMap] = useState<Record<string, string>>({});
   const [selectedAgent, setSelectedAgent] = useState<string>('all');
@@ -351,20 +365,29 @@ export function ChatLogTab({ agentColorMap: parentAgentColorMap, agentNameMap }:
     setSending(true);
     setUserInput('');
     try {
-      const mentions = parseMentions(text);
+      // In DM mode, auto-prepend @AgentName if not already present
+      let sendText = text;
+      if (isDM && dmAgentName) {
+        const alreadyMentioned = new RegExp(`@${dmAgentName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(text);
+        if (!alreadyMentioned) {
+          sendText = `@${dmAgentName} ${text}`;
+        }
+      }
+
+      const mentions = parseMentions(sendText);
       const hasMentions = mentions.agents.length > 0 || mentions.rooms.length > 0;
 
       if (hasMentions) {
         // Call the reply edge function for instant agent responses
         // The function inserts the user message + generates agent replies server-side
-        const { data, error } = await supabase.functions.invoke('reply', {
-          body: { content: text, mentions },
+        const { error } = await supabase.functions.invoke('reply', {
+          body: { content: sendText, mentions },
         });
         if (error) {
           console.error('Error sending message:', error);
           // If the function failed, insert the user message directly as fallback
           await supabase.from('messages').insert({
-            content: text,
+            content: sendText,
             room_id: rooms.length > 0 ? rooms[0].id : null,
             from_agent: null,
           });
@@ -372,7 +395,7 @@ export function ChatLogTab({ agentColorMap: parentAgentColorMap, agentNameMap }:
       } else {
         // No mentions — just insert as a regular visitor message
         const { error } = await supabase.from('messages').insert({
-          content: text,
+          content: sendText,
           room_id: rooms.length > 0 ? rooms[0].id : null,
           from_agent: null,
         });
@@ -422,9 +445,19 @@ export function ChatLogTab({ agentColorMap: parentAgentColorMap, agentNameMap }:
   }, [loadMessages]);
 
   const filteredMessages = messages.filter((msg) => {
+    if (isDM && dmAgentId && dmAgentName) {
+      // DM mode: show agent's messages + visitor messages that @mention them
+      if (msg.from_agent === dmAgentId) return true;
+      if (!msg.from_agent) {
+        return msg.content.toLowerCase().includes('@' + dmAgentName.toLowerCase());
+      }
+      return false;
+    }
+
+    // Group chat mode: filter by date + selected agent
     const msgDate = getDateKey(msg.ts);
     if (msgDate !== selectedDate) return false;
-    
+
     if (selectedAgent === 'all') return true;
     if (selectedAgent === 'anon') return !msg.from_agent;
     return msg.from_agent === selectedAgent;
@@ -487,101 +520,80 @@ export function ChatLogTab({ agentColorMap: parentAgentColorMap, agentNameMap }:
 
   return (
     <>
-      {/* Header Content - compact on mobile */}
-      <div className="bg-indigo-500 lg:bg-indigo-50 px-2 py-1.5 lg:p-3 border-b-2 lg:border-b-4 border-indigo-600 lg:border-indigo-300">
-        {/* Mobile: single compact row */}
-        <div className="flex items-center gap-1.5 lg:hidden">
-          <button
-            onClick={goToPreviousDay}
-            disabled={!canGoBack}
-            className="px-1.5 py-1 bg-indigo-700 text-white rounded disabled:opacity-40 text-[10px] pixel-text"
-          >
-            &lt;
-          </button>
-          <button
-            onClick={goToToday}
-            disabled={isToday}
-            className="px-1.5 py-1 bg-indigo-700 text-white rounded disabled:opacity-40 text-[10px] pixel-text"
-          >
-            NOW
-          </button>
-          <button
-            onClick={goToNextDay}
-            disabled={!canGoForward}
-            className="px-1.5 py-1 bg-indigo-700 text-white rounded disabled:opacity-40 text-[10px] pixel-text"
-          >
-            &gt;
-          </button>
-          {selectedDate && (
-            <span className="pixel-text text-white text-[8px] truncate">
-              {formatDateHeader(selectedDate)}
-            </span>
-          )}
-          {selectedDate && dayMessageCounts[selectedDate] !== undefined && (
-            <span className="pixel-text text-indigo-200 text-[8px]">
-              ({dayMessageCounts[selectedDate]})
-            </span>
-          )}
-          <select
-            value={selectedAgent}
-            onChange={(e) => setSelectedAgent(e.target.value)}
-            className="ml-auto text-[9px] px-1.5 py-1 rounded bg-indigo-700 text-white border border-indigo-800 pixel-text"
-          >
-            <option value="all">All</option>
-            {Object.entries(agentMap)
-              .sort((a, b) => a[1].localeCompare(b[1]))
-              .map(([id, name]) => (
-                <option key={id} value={id}>
-                  {name}
-                </option>
-              ))}
-          </select>
-        </div>
-
-        {/* Desktop: original layout */}
-        <div className="hidden lg:block">
-          {selectedDate && (
-            <div className="mb-3 inline-block bg-indigo-700 text-indigo-100 px-3 py-1 rounded-md border-2 border-indigo-800 pixel-text text-xs">
-              Viewing: {formatDateHeader(selectedDate)}
+      {/* Header Content */}
+      <div className="bg-indigo-500 px-2 py-2 lg:px-3 lg:py-2.5 border-b-4 border-indigo-700">
+        {isDM && dmAgentId && dmAgentName ? (
+          /* DM mode: back button + agent name header */
+          <div className="flex items-center gap-2">
+            {onBack && (
+              <button
+                onClick={onBack}
+                className="px-2 py-1 bg-indigo-700 hover:bg-indigo-900 text-white rounded border-2 border-indigo-900 pixel-text text-[10px] flex-shrink-0"
+              >
+                ← BACK
+              </button>
+            )}
+            <div
+              className="w-8 h-8 rounded-lg flex items-center justify-center text-white font-bold pixel-text text-xs flex-shrink-0 border-2"
+              style={{
+                backgroundColor: COLOR_HEX[agentColorMap[dmAgentId] || 'slate'] || '#64748b',
+                borderColor: COLOR_HEX[agentColorMap[dmAgentId] || 'slate'] || '#64748b',
+              }}
+            >
+              {dmAgentName[0]}
             </div>
-          )}
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-1">
+            <span className="pixel-text text-white text-xs font-bold truncate">{dmAgentName}</span>
+          </div>
+        ) : (
+          /* Group chat mode: back button + date nav + filter */
+          <>
+            {/* Mobile row */}
+            <div className="flex items-center gap-1.5 lg:hidden">
+              {onBack && (
+                <button
+                  onClick={onBack}
+                  className="px-1.5 py-1 bg-indigo-700 hover:bg-indigo-900 text-white rounded border-2 border-indigo-900 pixel-text text-[10px] flex-shrink-0"
+                >
+                  ←
+                </button>
+              )}
               <button
                 onClick={goToPreviousDay}
                 disabled={!canGoBack}
-                className="px-2 py-1 bg-indigo-600 text-white border-2 border-indigo-800 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-indigo-700 text-xs"
+                className="px-1.5 py-1 bg-indigo-700 text-white rounded disabled:opacity-40 text-[10px] pixel-text"
               >
-                &larr; Prev
+                &lt;
               </button>
               <button
                 onClick={goToToday}
                 disabled={isToday}
-                className="px-2 py-1 bg-indigo-600 text-white border-2 border-indigo-800 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-indigo-700 text-xs"
+                className="px-1.5 py-1 bg-indigo-700 text-white rounded disabled:opacity-40 text-[10px] pixel-text"
               >
-                Today
+                NOW
               </button>
               <button
                 onClick={goToNextDay}
                 disabled={!canGoForward}
-                className="px-2 py-1 bg-indigo-600 text-white border-2 border-indigo-800 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-indigo-700 text-xs"
+                className="px-1.5 py-1 bg-indigo-700 text-white rounded disabled:opacity-40 text-[10px] pixel-text"
               >
-                Next &rarr;
+                &gt;
               </button>
-              {selectedDate && dayMessageCounts[selectedDate] !== undefined && (
-                <span className="pixel-text text-indigo-700 text-xs ml-2">
-                  ({dayMessageCounts[selectedDate]} message{dayMessageCounts[selectedDate] === 1 ? '' : 's'})
+              {selectedDate && (
+                <span className="pixel-text text-white text-[8px] truncate">
+                  {formatDateHeader(selectedDate)}
                 </span>
               )}
-            </div>
-            <div className="ml-auto">
-              <label className="pixel-text text-indigo-900 text-xs mr-2">Filter:</label>
+              {selectedDate && dayMessageCounts[selectedDate] !== undefined && (
+                <span className="pixel-text text-indigo-200 text-[8px]">
+                  ({dayMessageCounts[selectedDate]})
+                </span>
+              )}
               <select
                 value={selectedAgent}
                 onChange={(e) => setSelectedAgent(e.target.value)}
-                className="text-xs px-2 py-1 rounded-md bg-indigo-600 text-white border-2 border-indigo-800"
+                className="ml-auto text-[9px] px-1.5 py-1 rounded bg-indigo-700 text-white border border-indigo-800 pixel-text"
               >
-                <option value="all">All agents</option>
+                <option value="all">All</option>
                 {Object.entries(agentMap)
                   .sort((a, b) => a[1].localeCompare(b[1]))
                   .map(([id, name]) => (
@@ -591,8 +603,75 @@ export function ChatLogTab({ agentColorMap: parentAgentColorMap, agentNameMap }:
                   ))}
               </select>
             </div>
-          </div>
-        </div>
+
+            {/* Desktop row */}
+            <div className="hidden lg:block">
+              <div className="flex items-center gap-2 mb-2">
+                {onBack && (
+                  <button
+                    onClick={onBack}
+                    className="px-2 py-1 bg-indigo-700 hover:bg-indigo-900 text-white rounded border-2 border-indigo-900 pixel-text text-[10px] flex-shrink-0"
+                  >
+                    ← BACK
+                  </button>
+                )}
+                <span className="pixel-text text-white text-xs font-bold">🌐 GROUP CHAT</span>
+              </div>
+              {selectedDate && (
+                <div className="mb-2 inline-block bg-indigo-700 text-indigo-100 px-3 py-1 rounded-md border-2 border-indigo-800 pixel-text text-xs">
+                  Viewing: {formatDateHeader(selectedDate)}
+                </div>
+              )}
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={goToPreviousDay}
+                    disabled={!canGoBack}
+                    className="px-2 py-1 bg-indigo-600 text-white border-2 border-indigo-800 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-indigo-700 text-xs"
+                  >
+                    &larr; Prev
+                  </button>
+                  <button
+                    onClick={goToToday}
+                    disabled={isToday}
+                    className="px-2 py-1 bg-indigo-600 text-white border-2 border-indigo-800 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-indigo-700 text-xs"
+                  >
+                    Today
+                  </button>
+                  <button
+                    onClick={goToNextDay}
+                    disabled={!canGoForward}
+                    className="px-2 py-1 bg-indigo-600 text-white border-2 border-indigo-800 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-indigo-700 text-xs"
+                  >
+                    Next &rarr;
+                  </button>
+                  {selectedDate && dayMessageCounts[selectedDate] !== undefined && (
+                    <span className="pixel-text text-indigo-200 text-xs ml-2">
+                      ({dayMessageCounts[selectedDate]} msg{dayMessageCounts[selectedDate] === 1 ? '' : 's'})
+                    </span>
+                  )}
+                </div>
+                <div className="ml-auto">
+                  <label className="pixel-text text-indigo-200 text-xs mr-2">Filter:</label>
+                  <select
+                    value={selectedAgent}
+                    onChange={(e) => setSelectedAgent(e.target.value)}
+                    className="text-xs px-2 py-1 rounded-md bg-indigo-600 text-white border-2 border-indigo-800"
+                  >
+                    <option value="all">All agents</option>
+                    {Object.entries(agentMap)
+                      .sort((a, b) => a[1].localeCompare(b[1]))
+                      .map(([id, name]) => (
+                        <option key={id} value={id}>
+                          {name}
+                        </option>
+                      ))}
+                  </select>
+                </div>
+              </div>
+            </div>
+          </>
+        )}
       </div>
 
       {/* Messages Content */}
@@ -754,7 +833,7 @@ export function ChatLogTab({ agentColorMap: parentAgentColorMap, agentNameMap }:
               // Delay to allow click on menu item
               setTimeout(() => setShowMentionMenu(false), 150);
             }}
-            placeholder="Say something... use @ to mention"
+            placeholder={isDM && dmAgentName ? `Message ${dmAgentName}...` : 'Say something... use @ to mention'}
             className="flex-1 px-3 py-2 bg-white text-gray-800 border-2 border-indigo-300 rounded-md pixel-text text-xs placeholder-gray-400 focus:outline-none focus:border-indigo-500"
             disabled={sending}
             maxLength={200}
