@@ -58,7 +58,7 @@ export const PixelRoomGrid: React.FC = () => {
 
         const uiRooms: RoomUI[] = roomsArr.map((r, idx) => {
           const inRoom = agents.filter((ag) => ag.room_id === r.id);
-          const chars = inRoom.map((ag) => (ag.name ? ag.name.charAt(0) : '🙂'));
+          const chars = inRoom.map((ag) => (ag.name ? ag.name.charAt(0) : ''));
           const usernames = inRoom.map((ag) => ag.name || 'Anon');
           // Cycle through available room images by index
           const bg = roomImages[idx % roomImages.length];
@@ -122,27 +122,55 @@ export const PixelRoomGrid: React.FC = () => {
     };
   }, []);
 
+  const nonElevatorRooms = rooms.filter(r => !r.isElevator);
+
   // Skeleton UI while loading
   if (isLoading) {
     return (
-      <div className="grid grid-cols-2 lg:grid-cols-7 gap-2 lg:gap-3 max-w-5xl w-full">
-        {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((i) => {
-          const isElevatorPos = i === 2 || i === 5 || i === 8;
-          return (
-            <div key={i} className={isElevatorPos ? 'hidden lg:block col-span-1' : 'aspect-square lg:aspect-video col-span-1 lg:col-span-3'}>
-              <div className="w-full h-full bg-gray-300 rounded-lg animate-pulse" />
-            </div>
-          );
-        })}
-      </div>
+      <>
+        {/* Mobile skeleton - fills viewport */}
+        <div className="lg:hidden w-full h-full grid grid-cols-2 grid-rows-3 gap-2 p-1">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <div key={i} className="bg-gray-300 rounded-xl animate-pulse" />
+          ))}
+        </div>
+        {/* Desktop skeleton */}
+        <div className="hidden lg:grid grid-cols-7 gap-3 max-w-5xl w-full auto-rows-fr">
+          {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((i) => {
+            const isElevatorPos = i === 2 || i === 5 || i === 8;
+            return (
+              <div key={i} className={isElevatorPos ? 'col-span-1' : 'aspect-video col-span-3'}>
+                <div className="w-full h-full bg-gray-300 rounded-lg animate-pulse" />
+              </div>
+            );
+          })}
+        </div>
+      </>
     );
   }
 
   return (
     <>
-      <div className="grid grid-cols-2 lg:grid-cols-7 gap-2 lg:gap-3 max-w-5xl w-full">
+      {/* Mobile: 2x3 grid that fills the available space */}
+      <div className="lg:hidden w-full h-full grid grid-cols-2 grid-rows-3 gap-2 p-1">
+        {nonElevatorRooms.map((room) => (
+          <div key={room.id} className="relative rounded-xl overflow-hidden">
+            <RoomCard
+              color="teal"
+              characters={room.characters}
+              usernames={room.usernames}
+              roomName={room.roomName}
+              status={room.status}
+              backgroundImage={room.backgroundImage}
+            />
+          </div>
+        ))}
+      </div>
+
+      {/* Desktop: original 7-column grid with elevators */}
+      <div className="hidden lg:grid grid-cols-7 gap-3 max-w-5xl w-full auto-rows-fr">
         {rooms.map((room) => (
-          <div key={room.id} className={room.isElevator ? 'hidden lg:block col-span-1' : 'aspect-square lg:aspect-video col-span-1 lg:col-span-3'}>
+          <div key={room.id} className={room.isElevator ? 'col-span-1' : 'aspect-video col-span-3'}>
             {room.isElevator ? (
               <ElevatorCard
                 characters={room.characters}

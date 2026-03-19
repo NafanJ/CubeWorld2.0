@@ -37,23 +37,23 @@ export function ChatMessage({
   };
 
   const allColorClasses = { ...colorClasses, ...extended } as Record<string, string>;
-  return <div className="flex items-center gap-3 mb-4 animate-slide-in">
+  return <div className="flex items-start gap-2 lg:gap-3 mb-2 lg:mb-4 animate-slide-in">
       <div className="flex-shrink-0">
-        <div className={`w-10 h-10 rounded-lg border-4 ${allColorClasses[color as keyof typeof allColorClasses]} flex items-center justify-center text-xl`}>
+        <div className={`w-8 h-8 lg:w-10 lg:h-10 rounded-lg border-2 lg:border-4 ${allColorClasses[color as keyof typeof allColorClasses]} flex items-center justify-center text-base lg:text-xl`}>
           {avatar}
         </div>
       </div>
       <div className="flex-1 min-w-0">
-        <div className="flex items-baseline gap-2 mb-1">
-          <span className="pixel-text text-xs lg:text-sm font-bold text-gray-900">
+        <div className="flex items-baseline gap-1.5 lg:gap-2 mb-0.5 lg:mb-1">
+          <span className="pixel-text text-[10px] lg:text-sm font-bold text-gray-900">
             {username}
           </span>
-          <span className="pixel-text text-[8px] lg:text-[10px] text-gray-500">
+          <span className="pixel-text text-[7px] lg:text-[10px] text-gray-500">
             {timestamp}
           </span>
         </div>
-        <div className={`${allColorClasses[color as keyof typeof allColorClasses]} border-4 rounded-lg px-3 py-2 pixel-border-sm`}>
-          <p className="pixel-text text-xs lg:text-sm text-gray-900">{message}</p>
+        <div className={`${allColorClasses[color as keyof typeof allColorClasses]} border-2 lg:border-4 rounded-lg px-2 py-1.5 lg:px-3 lg:py-2 pixel-border-sm`}>
+          <p className="pixel-text text-[9px] lg:text-sm text-gray-900 leading-relaxed">{message}</p>
         </div>
       </div>
     </div>;
