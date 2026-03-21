@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
-import { Activity, MessageSquare, Users, Zap } from 'lucide-react';
+import { Activity, Loader2, MessageSquare, Users, Zap } from 'lucide-react';
 
 type WorldState = {
   id: number;
@@ -15,6 +15,7 @@ export function SystemTab() {
   const [activeAgents, setActiveAgents] = useState(0);
   const [tickLoading, setTickLoading] = useState(false);
   const [tickResult, setTickResult] = useState<'success' | 'error' | null>(null);
+  const [tickResultVisible, setTickResultVisible] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -53,15 +54,20 @@ export function SystemTab() {
   const handleRunTick = async () => {
     setTickLoading(true);
     setTickResult(null);
+    setTickResultVisible(false);
     try {
       const { error } = await supabase.functions.invoke('tick', { method: 'POST' });
       if (error) throw error;
       setTickResult('success');
-      setTimeout(() => setTickResult(null), 2000);
+      setTickResultVisible(true);
+      setTimeout(() => setTickResultVisible(false), 2000);
+      setTimeout(() => setTickResult(null), 2600);
     } catch (err) {
       console.error('Tick failed', err);
       setTickResult('error');
-      setTimeout(() => setTickResult(null), 3000);
+      setTickResultVisible(true);
+      setTimeout(() => setTickResultVisible(false), 2500);
+      setTimeout(() => setTickResult(null), 3100);
     } finally {
       setTickLoading(false);
     }
@@ -128,16 +134,20 @@ export function SystemTab() {
           <button
             onClick={handleRunTick}
             disabled={tickLoading}
-            className="px-5 py-2.5 rounded-lg text-sm font-semibold text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            style={{ backgroundColor: tickLoading ? '#6ee7b7' : '#059669' }}
+            className="px-5 py-2.5 rounded-lg text-sm font-semibold text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            style={{ backgroundColor: '#059669' }}
           >
+            {tickLoading && <Loader2 className="w-4 h-4 animate-spin" />}
             {tickLoading ? 'Running…' : 'Run Tick'}
           </button>
-          {tickResult === 'success' && (
-            <span className="text-sm font-medium text-emerald-600">Tick completed!</span>
-          )}
-          {tickResult === 'error' && (
-            <span className="text-sm font-medium text-red-500">Tick failed</span>
+          {tickResult && (
+            <span
+              className={`text-sm font-medium transition-opacity duration-500 ${
+                tickResultVisible ? 'opacity-100' : 'opacity-0'
+              } ${tickResult === 'success' ? 'text-emerald-600' : 'text-red-500'}`}
+            >
+              {tickResult === 'success' ? 'Tick completed!' : 'Tick failed'}
+            </span>
           )}
         </div>
       </div>
