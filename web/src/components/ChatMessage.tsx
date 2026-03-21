@@ -1,3 +1,11 @@
+const COLOR_HEX: Record<string, string> = {
+  red: '#ef4444', orange: '#f97316', green: '#22c55e', blue: '#3b82f6',
+  purple: '#a855f7', teal: '#14b8a6', yellow: '#eab308', pink: '#ec4899',
+  indigo: '#6366f1', lime: '#84cc16', amber: '#f59e0b', rose: '#f43f5e',
+  cyan: '#06b6d4', sky: '#0ea5e9', violet: '#8b5cf6', emerald: '#10b981',
+  fuchsia: '#d946ef', slate: '#64748b',
+};
+
 interface ChatMessageProps {
   username: string;
   message: string;
@@ -5,56 +13,36 @@ interface ChatMessageProps {
   color: string;
   avatar: string;
 }
-export function ChatMessage({
-  username,
-  message,
-  timestamp,
-  color,
-  avatar
-}: ChatMessageProps) {
-  const colorClasses = {
-    red: 'bg-red-100 border-red-500',
-    orange: 'bg-orange-100 border-orange-500',
-    green: 'bg-green-100 border-green-500',
-    blue: 'bg-blue-100 border-blue-500',
-    purple: 'bg-purple-100 border-purple-500',
-    teal: 'bg-teal-100 border-teal-500'
-  };
-  // Extended palette to allow more unique agent colors
-  const extended = {
-    yellow: 'bg-yellow-100 border-yellow-500',
-    pink: 'bg-pink-100 border-pink-500',
-    indigo: 'bg-indigo-100 border-indigo-500',
-    lime: 'bg-lime-100 border-lime-500',
-    amber: 'bg-amber-100 border-amber-500',
-    rose: 'bg-rose-100 border-rose-500',
-    cyan: 'bg-cyan-100 border-cyan-500',
-    sky: 'bg-sky-100 border-sky-500',
-    violet: 'bg-violet-100 border-violet-500',
-    emerald: 'bg-emerald-100 border-emerald-500',
-    fuchsia: 'bg-fuchsia-100 border-fuchsia-500',
-    slate: 'bg-slate-100 border-slate-500'
-  };
 
-  const allColorClasses = { ...colorClasses, ...extended } as Record<string, string>;
-  return <div className="flex items-start gap-2 lg:gap-3 mb-2 lg:mb-4 animate-slide-in">
-      <div className="flex-shrink-0">
-        <div className={`w-8 h-8 lg:w-10 lg:h-10 rounded-lg border-2 lg:border-4 ${allColorClasses[color as keyof typeof allColorClasses]} flex items-center justify-center text-base lg:text-xl`}>
-          {avatar}
-        </div>
+export function ChatMessage({ username, message, timestamp, color, avatar }: ChatMessageProps) {
+  const isVisitor = username === 'Visitor';
+  const hex = isVisitor ? '#a8a29e' : (COLOR_HEX[color] || '#64748b');
+
+  return (
+    <div className="flex items-start gap-3 py-2.5 px-4 hover:bg-stone-50 transition-colors animate-slide-in group">
+      {/* Avatar */}
+      <div
+        className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-semibold flex-shrink-0 mt-0.5"
+        style={{ backgroundColor: isVisitor ? '#d6d3d1' : hex }}
+      >
+        {isVisitor ? '?' : (typeof avatar === 'string' && avatar.length === 1 ? avatar : username[0] || '?')}
       </div>
+
+      {/* Content */}
       <div className="flex-1 min-w-0">
-        <div className="flex items-baseline gap-1.5 lg:gap-2 mb-0.5 lg:mb-1">
-          <span className="pixel-text text-[10px] lg:text-sm font-bold text-gray-900">
+        <div className="flex items-baseline gap-2 mb-0.5">
+          <span
+            className="text-sm font-semibold"
+            style={{ color: isVisitor ? '#78716c' : hex }}
+          >
             {username}
           </span>
-          <span className="pixel-text text-[7px] lg:text-[10px] text-gray-500">
-            {timestamp}
-          </span>
+          <span className="text-xs text-stone-400">{timestamp}</span>
         </div>
-        <div className={`${allColorClasses[color as keyof typeof allColorClasses]} border-2 lg:border-4 rounded-lg px-2 py-1.5 lg:px-3 lg:py-2 pixel-border-sm`}>
-          <p className="pixel-text text-[9px] lg:text-sm text-gray-900 leading-relaxed">{message}</p>
-        </div>
+        <p className={`text-sm leading-relaxed ${isVisitor ? 'text-stone-400 italic' : 'text-stone-700'}`}>
+          {message}
+        </p>
       </div>
-    </div>;
+    </div>
+  );
 }

@@ -6,32 +6,23 @@ import { ConversationList } from './ConversationList';
 import { StatusTab } from './StatusTab';
 import { SystemTab } from './SystemTab';
 import { DiaryTab } from './DiaryTab';
+import { PixelRoomGrid } from './PixelRoomGrid';
+import type { ActiveTab } from '../App';
 
-type TabType = 'chat' | 'status' | 'diary' | 'system';
+type LogsSubTab = 'chat' | 'diary';
 
 interface ChatPanelProps {
-  mobileTab?: 'chat' | 'diary' | 'status';
+  activeSection: ActiveTab;
 }
 
-export function ChatPanel({ mobileTab }: ChatPanelProps) {
-  const [desktopTab, setDesktopTab] = useState<TabType>('chat');
+export function ChatPanel({ activeSection }: ChatPanelProps) {
   const [agentColorMap, setAgentColorMap] = useState<Record<string, string>>({});
   const [agentNameMap, setAgentNameMap] = useState<Record<string, string>>({});
-  const [isMobile, setIsMobile] = useState(false);
+  const [logsSubTab, setLogsSubTab] = useState<LogsSubTab>('chat');
   // null = conversation list, 'group' = group chat thread, agentId = DM thread
   const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
 
-  useEffect(() => {
-    const mq = window.matchMedia('(max-width: 1023px)');
-    setIsMobile(mq.matches);
-    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
-    mq.addEventListener('change', handler);
-    return () => mq.removeEventListener('change', handler);
-  }, []);
-
-  const activeTab = isMobile ? (mobileTab || 'chat') : desktopTab;
-
-  // Load agents to build color map for consistency across tabs
+  // Load agents to build color map for consistency across all sections
   useEffect(() => {
     let mounted = true;
     const loadAgents = async () => {
@@ -52,7 +43,6 @@ export function ChatPanel({ mobileTab }: ChatPanelProps) {
 
     loadAgents();
 
-    // Subscribe to agent changes
     const channel = supabase
       .channel('public:agents:colors')
       .on(
@@ -92,95 +82,88 @@ export function ChatPanel({ mobileTab }: ChatPanelProps) {
   }, []);
 
   return (
-    <div className="relative flex flex-col h-full bg-gradient-to-br from-indigo-100 to-purple-100 lg:border-l-8 lg:border-indigo-500">
-      {/* Tab Navigation Header - desktop only */}
-      <div className="hidden lg:block bg-indigo-500 border-b-8 border-indigo-700 p-4 pixel-border-bottom">
-        <div className="flex gap-1 mb-3">
+    <div className="flex flex-col h-full">
+      {/* Overview — room grid */}
+      <div
+        style={{ display: activeSection === 'overview' ? 'flex' : 'none' }}
+        className="flex-1 min-h-0 overflow-auto bg-stone-50 items-start lg:items-center justify-center p-4 lg:p-8"
+      >
+        <PixelRoomGrid agentColorMap={agentColorMap} />
+      </div>
+
+      {/* Directory — villager cards */}
+      <div
+        style={{ display: activeSection === 'directory' ? 'flex' : 'none' }}
+        className="flex-1 min-h-0 flex flex-col overflow-hidden"
+      >
+        <StatusTab agentColorMap={agentColorMap} />
+      </div>
+
+      {/* Logs — chat + diary */}
+      <div
+        style={{ display: activeSection === 'logs' ? 'flex' : 'none' }}
+        className="flex-1 min-h-0 flex flex-col overflow-hidden"
+      >
+        {/* Logs sub-tab nav */}
+        <div className="flex border-b border-stone-200 bg-white px-4 flex-shrink-0">
           <button
-            onClick={() => setDesktopTab('chat')}
-            className={`flex-1 px-1 py-2 rounded-md pixel-text text-xs font-bold transition-colors ${
-              desktopTab === 'chat'
-                ? 'bg-indigo-700 text-white border-2 border-indigo-900'
-                : 'bg-indigo-400 text-indigo-900 border-2 border-indigo-600 hover:bg-indigo-500'
+            onClick={() => setLogsSubTab('chat')}
+            className={`px-4 py-3 text-sm font-medium border-b-2 -mb-px transition-colors ${
+              logsSubTab === 'chat'
+                ? 'border-emerald-600 text-emerald-700'
+                : 'border-transparent text-stone-500 hover:text-stone-700'
             }`}
           >
-            <span className="hidden sm:inline">MESSAGES</span>
-            <span className="sm:hidden">MSG</span>
+            Chat
           </button>
           <button
-            onClick={() => setDesktopTab('status')}
-            className={`flex-1 px-1 py-2 rounded-md pixel-text text-xs font-bold transition-colors ${
-              desktopTab === 'status'
-                ? 'bg-indigo-700 text-white border-2 border-indigo-900'
-                : 'bg-indigo-400 text-indigo-900 border-2 border-indigo-600 hover:bg-indigo-500'
+            onClick={() => setLogsSubTab('diary')}
+            className={`px-4 py-3 text-sm font-medium border-b-2 -mb-px transition-colors ${
+              logsSubTab === 'diary'
+                ? 'border-emerald-600 text-emerald-700'
+                : 'border-transparent text-stone-500 hover:text-stone-700'
             }`}
           >
-            STATUS
-          </button>
-          <button
-            onClick={() => setDesktopTab('diary')}
-            className={`flex-1 px-1 py-2 rounded-md pixel-text text-xs font-bold transition-colors ${
-              desktopTab === 'diary'
-                ? 'bg-amber-700 text-white border-2 border-amber-900'
-                : 'bg-indigo-400 text-indigo-900 border-2 border-indigo-600 hover:bg-indigo-500'
-            }`}
-          >
-            DIARY
-          </button>
-          <button
-            onClick={() => setDesktopTab('system')}
-            className={`flex-1 px-1 py-2 rounded-md pixel-text text-xs font-bold transition-colors ${
-              desktopTab === 'system'
-                ? 'bg-indigo-700 text-white border-2 border-indigo-900'
-                : 'bg-indigo-400 text-indigo-900 border-2 border-indigo-600 hover:bg-indigo-500'
-            }`}
-          >
-            <span className="hidden sm:inline">SYSTEM</span>
-            <span className="sm:hidden">SYS</span>
+            Diary
           </button>
         </div>
 
-        {/* Status Tab Header */}
-        {desktopTab === 'status' && (
-          <h2 className="pixel-text text-white text-lg font-bold">AGENT STATUS</h2>
-        )}
+        {/* Chat sub-section */}
+        <div
+          style={{ display: logsSubTab === 'chat' ? 'flex' : 'none' }}
+          className="flex-1 min-h-0 flex flex-col overflow-hidden"
+        >
+          {selectedConversation === null ? (
+            <ConversationList
+              agentColorMap={agentColorMap}
+              agentNameMap={agentNameMap}
+              onSelect={setSelectedConversation}
+            />
+          ) : (
+            <ChatLogTab
+              agentColorMap={agentColorMap}
+              agentNameMap={agentNameMap}
+              dmAgentId={selectedConversation === 'group' ? null : selectedConversation}
+              dmAgentName={selectedConversation === 'group' ? null : agentNameMap[selectedConversation]}
+              onBack={() => setSelectedConversation(null)}
+            />
+          )}
+        </div>
 
-        {/* Diary Tab Header */}
-        {desktopTab === 'diary' && (
-          <h2 className="pixel-text text-white text-lg font-bold">AGENT DIARIES</h2>
-        )}
-
-        {/* System Tab Header */}
-        {desktopTab === 'system' && (
-          <h2 className="pixel-text text-white text-lg font-bold">SYSTEM</h2>
-        )}
+        {/* Diary sub-section */}
+        <div
+          style={{ display: logsSubTab === 'diary' ? 'flex' : 'none' }}
+          className="flex-1 min-h-0 flex flex-col overflow-hidden"
+        >
+          <DiaryTab agentColorMap={agentColorMap} />
+        </div>
       </div>
 
-      {/* Keep all tabs mounted but hidden to preserve state */}
-      <div style={{ display: activeTab === 'chat' ? 'flex' : 'none' }} className="flex flex-col flex-1 min-h-0">
-        {selectedConversation === null ? (
-          <ConversationList
-            agentColorMap={agentColorMap}
-            agentNameMap={agentNameMap}
-            onSelect={setSelectedConversation}
-          />
-        ) : (
-          <ChatLogTab
-            agentColorMap={agentColorMap}
-            agentNameMap={agentNameMap}
-            dmAgentId={selectedConversation === 'group' ? null : selectedConversation}
-            dmAgentName={selectedConversation === 'group' ? null : agentNameMap[selectedConversation]}
-            onBack={() => setSelectedConversation(null)}
-          />
-        )}
-      </div>
-      <div style={{ display: activeTab === 'status' ? 'flex' : 'none' }} className="flex-1 min-h-0 flex flex-col">
-        <StatusTab agentColorMap={agentColorMap} />
-      </div>
-      <div style={{ display: activeTab === 'diary' ? 'flex' : 'none' }} className="flex-1 min-h-0 flex flex-col">
-        <DiaryTab agentColorMap={agentColorMap} />
-      </div>
-      <div style={{ display: activeTab === 'system' ? 'flex' : 'none' }} className="flex-1 min-h-0 flex flex-col">
+      {/* System — stats + controls */}
+      <div
+        style={{ display: activeSection === 'system' ? 'flex' : 'none' }}
+        className="flex-1 min-h-0 flex flex-col overflow-hidden"
+      >
         <SystemTab />
       </div>
     </div>

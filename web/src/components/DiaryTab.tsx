@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { supabase } from '../lib/supabase';
+import { ChevronLeft, ChevronRight, BookOpen } from 'lucide-react';
 
 interface DiaryEntry {
   id: number;
@@ -11,6 +12,14 @@ interface DiaryEntry {
 interface DiaryTabProps {
   agentColorMap: Record<string, string>;
 }
+
+const COLOR_HEX: Record<string, string> = {
+  red: '#ef4444', orange: '#f97316', green: '#22c55e', blue: '#3b82f6',
+  purple: '#a855f7', teal: '#14b8a6', yellow: '#eab308', pink: '#ec4899',
+  indigo: '#6366f1', lime: '#84cc16', amber: '#f59e0b', rose: '#f43f5e',
+  cyan: '#06b6d4', sky: '#0ea5e9', violet: '#8b5cf6', emerald: '#10b981',
+  fuchsia: '#d946ef', slate: '#64748b',
+};
 
 function formatTime(iso?: string) {
   if (!iso) return '';
@@ -24,11 +33,7 @@ function formatTime(iso?: string) {
 function formatDateHeader(dateKey: string): string {
   try {
     const date = new Date(dateKey + 'T00:00:00Z');
-    return date.toLocaleDateString('en-US', {
-      weekday: 'long',
-      month: 'short',
-      day: 'numeric'
-    });
+    return date.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
   } catch {
     return dateKey;
   }
@@ -40,30 +45,6 @@ function getDateKey(iso: string): string {
   } catch {
     return '';
   }
-}
-
-function getColorValue(color: string, shade: number): string {
-  const colorMap: Record<string, Record<number, string>> = {
-    red: { 500: '#ef4444', 700: '#b91c1c' },
-    orange: { 500: '#f97316', 700: '#c2410c' },
-    green: { 500: '#22c55e', 700: '#15803d' },
-    blue: { 500: '#3b82f6', 700: '#1d4ed8' },
-    purple: { 500: '#a855f7', 700: '#7e22ce' },
-    teal: { 500: '#14b8a6', 700: '#0f766e' },
-    yellow: { 500: '#eab308', 700: '#a16207' },
-    pink: { 500: '#ec4899', 700: '#be185d' },
-    indigo: { 500: '#6366f1', 700: '#4338ca' },
-    lime: { 500: '#84cc16', 700: '#4d7c0f' },
-    amber: { 500: '#f59e0b', 700: '#b45309' },
-    rose: { 500: '#f43f5e', 700: '#be123c' },
-    cyan: { 500: '#06b6d4', 700: '#0e7490' },
-    sky: { 500: '#0ea5e9', 700: '#0369a1' },
-    violet: { 500: '#8b5cf6', 700: '#6d28d9' },
-    emerald: { 500: '#10b981', 700: '#047857' },
-    fuchsia: { 500: '#d946ef', 700: '#a21caf' },
-    slate: { 500: '#64748b', 700: '#334155' },
-  };
-  return colorMap[color]?.[shade] || colorMap.slate[shade];
 }
 
 export function DiaryTab({ agentColorMap }: DiaryTabProps) {
@@ -87,11 +68,7 @@ export function DiaryTab({ agentColorMap }: DiaryTabProps) {
       .select('id, ts, agent_id, text')
       .order('ts', { ascending: false });
 
-    if (error) {
-      console.error('Error loading diary entries', error);
-      return;
-    }
-
+    if (error) { console.error('Error loading diary entries', error); return; }
     if (!isMounted.current || !data) return;
 
     const ordered = (data as DiaryEntry[]).reverse();
@@ -100,18 +77,14 @@ export function DiaryTab({ agentColorMap }: DiaryTabProps) {
     const dateToCount: Record<string, number> = {};
     for (const entry of ordered) {
       const dateKey = getDateKey(entry.ts);
-      if (dateKey) {
-        dateToCount[dateKey] = (dateToCount[dateKey] || 0) + 1;
-      }
+      if (dateKey) dateToCount[dateKey] = (dateToCount[dateKey] || 0) + 1;
     }
 
     const dates = Object.keys(dateToCount).sort().reverse();
     setAvailableDates(dates);
     setDayEntryCounts(dateToCount);
 
-    if (!selectedDate && dates.length > 0) {
-      setSelectedDate(dates[0]);
-    }
+    if (!selectedDate && dates.length > 0) setSelectedDate(dates[0]);
   }, [selectedDate]);
 
   useEffect(() => {
@@ -123,40 +96,29 @@ export function DiaryTab({ agentColorMap }: DiaryTabProps) {
     initialLoad();
   }, []);
 
-  // Load agent names
   useEffect(() => {
     let mounted = true;
     const loadAgents = async () => {
       const { data, error } = await supabase.from('agents').select('id, name');
       if (error || !mounted || !data) return;
-
       const map: Record<string, string> = {};
       for (const a of data as Array<{ id: string; name: string }>) {
         if (a?.id && a?.name) map[a.id] = a.name;
       }
       setAgentMap(map);
     };
-
     loadAgents();
     return () => { mounted = false; };
   }, []);
 
-  // Realtime subscription for new diary entries
   useEffect(() => {
     const channel = supabase
       .channel('public:diary_entries')
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'diary_entries' },
-        () => {
-          loadEntries();
-        }
-      )
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'diary_entries' }, () => {
+        loadEntries();
+      })
       .subscribe();
-
-    return () => {
-      void supabase.removeChannel(channel);
-    };
+    return () => { void supabase.removeChannel(channel); };
   }, [loadEntries]);
 
   const filteredEntries = entries.filter((entry) => {
@@ -168,22 +130,16 @@ export function DiaryTab({ agentColorMap }: DiaryTabProps) {
 
   const goToPreviousDay = useCallback(() => {
     const idx = availableDates.indexOf(selectedDate);
-    if (idx < availableDates.length - 1) {
-      setSelectedDate(availableDates[idx + 1]);
-    }
+    if (idx < availableDates.length - 1) setSelectedDate(availableDates[idx + 1]);
   }, [availableDates, selectedDate]);
 
   const goToNextDay = useCallback(() => {
     const idx = availableDates.indexOf(selectedDate);
-    if (idx > 0) {
-      setSelectedDate(availableDates[idx - 1]);
-    }
+    if (idx > 0) setSelectedDate(availableDates[idx - 1]);
   }, [availableDates, selectedDate]);
 
   const goToToday = useCallback(() => {
-    if (availableDates.length > 0) {
-      setSelectedDate(availableDates[0]);
-    }
+    if (availableDates.length > 0) setSelectedDate(availableDates[0]);
   }, [availableDates]);
 
   const isToday = availableDates.length > 0 && selectedDate === availableDates[0];
@@ -192,127 +148,75 @@ export function DiaryTab({ agentColorMap }: DiaryTabProps) {
 
   return (
     <>
-      {/* Header - compact on mobile */}
-      <div className="bg-amber-600 lg:bg-amber-50 px-2 py-1.5 lg:p-3 border-b-2 lg:border-b-4 border-amber-700 lg:border-amber-300">
-        {/* Mobile: compact row */}
-        <div className="flex items-center gap-1.5 lg:hidden">
+      {/* Header */}
+      <div className="bg-white border-b border-stone-200 px-4 py-3 flex items-center gap-3 flex-wrap flex-shrink-0">
+        <div className="flex items-center gap-1.5 text-stone-600">
+          <BookOpen className="w-4 h-4" />
+          <span className="text-sm font-semibold text-stone-700">Agent Diaries</span>
+        </div>
+
+        {/* Date nav */}
+        <div className="flex items-center gap-1">
           <button
             onClick={goToPreviousDay}
             disabled={!canGoBack}
-            className="px-1.5 py-1 bg-amber-700 text-white rounded disabled:opacity-40 text-[10px] pixel-text"
+            className="p-1 rounded text-stone-400 hover:text-stone-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
           >
-            &lt;
+            <ChevronLeft className="w-4 h-4" />
           </button>
-          <button
-            onClick={goToToday}
-            disabled={isToday}
-            className="px-1.5 py-1 bg-amber-700 text-white rounded disabled:opacity-40 text-[10px] pixel-text"
-          >
-            NOW
-          </button>
+          {selectedDate && (
+            <button
+              onClick={goToToday}
+              disabled={isToday}
+              className="text-xs px-2 py-0.5 rounded-md text-stone-500 hover:bg-stone-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              {isToday ? 'Today' : formatDateHeader(selectedDate)}
+            </button>
+          )}
           <button
             onClick={goToNextDay}
             disabled={!canGoForward}
-            className="px-1.5 py-1 bg-amber-700 text-white rounded disabled:opacity-40 text-[10px] pixel-text"
+            className="p-1 rounded text-stone-400 hover:text-stone-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
           >
-            &gt;
+            <ChevronRight className="w-4 h-4" />
           </button>
-          {selectedDate && (
-            <span className="pixel-text text-white text-[8px] truncate">
-              {formatDateHeader(selectedDate)}
-            </span>
-          )}
           {selectedDate && dayEntryCounts[selectedDate] !== undefined && (
-            <span className="pixel-text text-amber-200 text-[8px]">
-              ({dayEntryCounts[selectedDate]})
-            </span>
+            <span className="text-xs text-stone-400">({dayEntryCounts[selectedDate]})</span>
           )}
-          <select
-            value={selectedAgent}
-            onChange={(e) => setSelectedAgent(e.target.value)}
-            className="ml-auto text-[9px] px-1.5 py-1 rounded bg-amber-700 text-white border border-amber-800 pixel-text"
-          >
-            <option value="all">All</option>
-            {Object.entries(agentMap)
-              .sort((a, b) => a[1].localeCompare(b[1]))
-              .map(([id, name]) => (
-                <option key={id} value={id}>
-                  {name}
-                </option>
-              ))}
-          </select>
         </div>
 
-        {/* Desktop: original layout */}
-        <div className="hidden lg:block">
-          {selectedDate && (
-            <div className="mb-3 inline-block bg-amber-700 text-amber-100 px-3 py-1 rounded-md border-2 border-amber-800 pixel-text text-xs">
-              Viewing: {formatDateHeader(selectedDate)}
-            </div>
-          )}
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-1">
-              <button
-                onClick={goToPreviousDay}
-                disabled={!canGoBack}
-                className="px-2 py-1 bg-amber-600 text-white border-2 border-amber-800 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-amber-700 text-xs"
-              >
-                &larr; Prev
-              </button>
-              <button
-                onClick={goToToday}
-                disabled={isToday}
-                className="px-2 py-1 bg-amber-600 text-white border-2 border-amber-800 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-amber-700 text-xs"
-              >
-                Today
-              </button>
-              <button
-                onClick={goToNextDay}
-                disabled={!canGoForward}
-                className="px-2 py-1 bg-amber-600 text-white border-2 border-amber-800 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-amber-700 text-xs"
-              >
-                Next &rarr;
-              </button>
-              {selectedDate && dayEntryCounts[selectedDate] !== undefined && (
-                <span className="pixel-text text-amber-700 text-xs ml-2">
-                  ({dayEntryCounts[selectedDate]} entr{dayEntryCounts[selectedDate] === 1 ? 'y' : 'ies'})
-                </span>
-              )}
-            </div>
-            <div className="ml-auto">
-              <label className="pixel-text text-amber-900 text-xs mr-2">Filter:</label>
-              <select
-                value={selectedAgent}
-                onChange={(e) => setSelectedAgent(e.target.value)}
-                className="text-xs px-2 py-1 rounded-md bg-amber-600 text-white border-2 border-amber-800"
-              >
-                <option value="all">All agents</option>
-                {Object.entries(agentMap)
-                  .sort((a, b) => a[1].localeCompare(b[1]))
-                  .map(([id, name]) => (
-                    <option key={id} value={id}>
-                      {name}
-                    </option>
-                  ))}
-              </select>
-            </div>
-          </div>
-        </div>
+        {/* Agent filter */}
+        <select
+          value={selectedAgent}
+          onChange={(e) => setSelectedAgent(e.target.value)}
+          className="ml-auto text-xs px-2.5 py-1.5 rounded-lg bg-stone-100 text-stone-600 border border-stone-200 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+        >
+          <option value="all">All agents</option>
+          {Object.entries(agentMap)
+            .sort((a, b) => a[1].localeCompare(b[1]))
+            .map(([id, name]) => (
+              <option key={id} value={id}>{name}</option>
+            ))}
+        </select>
       </div>
 
-      {/* Diary Entries */}
-      <div className="flex-1 overflow-y-auto p-2 lg:p-4 space-y-2 lg:space-y-3">
+      {/* Diary entries */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-stone-50">
         {loading && (
           <div className="space-y-3">
             {[1, 2, 3].map((i) => (
-              <div key={i} className="bg-amber-50 border-4 border-amber-200 rounded-lg p-3 animate-pulse">
-                <div className="flex items-start gap-3">
-                  <div className="w-10 h-10 rounded-full bg-amber-200" />
-                  <div className="flex-1 space-y-2">
-                    <div className="h-3 bg-amber-200 rounded w-1/4" />
-                    <div className="h-4 bg-amber-200 rounded w-full" />
-                    <div className="h-4 bg-amber-200 rounded w-3/4" />
+              <div key={i} className="bg-white rounded-xl border border-stone-200 p-4 animate-pulse">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-9 h-9 rounded-full bg-stone-200" />
+                  <div className="space-y-1.5 flex-1">
+                    <div className="h-3.5 bg-stone-200 rounded w-1/4" />
+                    <div className="h-3 bg-stone-100 rounded w-1/6" />
                   </div>
+                </div>
+                <div className="space-y-1.5">
+                  <div className="h-3.5 bg-stone-100 rounded w-full" />
+                  <div className="h-3.5 bg-stone-100 rounded w-5/6" />
+                  <div className="h-3.5 bg-stone-100 rounded w-3/4" />
                 </div>
               </div>
             ))}
@@ -320,50 +224,39 @@ export function DiaryTab({ agentColorMap }: DiaryTabProps) {
         )}
 
         {entries.length === 0 && !loading && (
-          <div className="text-xs text-gray-500">No diary entries yet. Agents will begin writing after a few ticks.</div>
+          <div className="text-center py-12 text-sm text-stone-400">
+            No diary entries yet. Agents will begin writing after a few ticks.
+          </div>
         )}
 
         {entries.length > 0 && filteredEntries.length === 0 && !loading && (
-          <div className="text-xs text-gray-500">No diary entries on this day.</div>
+          <div className="text-center py-12 text-sm text-stone-400">No diary entries on this day.</div>
         )}
 
         {filteredEntries.map((entry) => {
           const agentName = agentMap[entry.agent_id] || 'Unknown';
           const color = agentColorMap[entry.agent_id] || 'slate';
-          const avatar = agentName[0] || '?';
+          const hex = COLOR_HEX[color] || '#64748b';
           const time = formatTime(entry.ts);
 
           return (
             <div
               key={entry.id}
-              className="bg-amber-50 border-2 lg:border-4 border-amber-300 rounded-lg p-2 lg:p-3 pixel-border-sm animate-slide-in"
+              className="bg-white rounded-xl border border-stone-200 p-4 animate-slide-in"
             >
-              <div className="flex items-start gap-2 lg:gap-3">
-                {/* Agent Avatar */}
+              <div className="flex items-center gap-2.5 mb-3">
                 <div
-                  className="w-8 h-8 lg:w-10 lg:h-10 rounded-full flex items-center justify-center text-white font-bold text-sm lg:text-lg flex-shrink-0 border-2"
-                  style={{
-                    backgroundColor: getColorValue(color, 500),
-                    borderColor: getColorValue(color, 700),
-                  }}
+                  className="w-9 h-9 rounded-full flex items-center justify-center text-white font-semibold text-sm flex-shrink-0"
+                  style={{ backgroundColor: hex }}
                 >
-                  {avatar}
+                  {agentName[0] || '?'}
                 </div>
-
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-baseline gap-1.5 lg:gap-2 mb-0.5 lg:mb-1">
-                    <span className="pixel-text text-[10px] lg:text-xs font-bold text-amber-800">
-                      {agentName}&apos;s Diary
-                    </span>
-                    <span className="pixel-text text-[7px] lg:text-[8px] text-gray-500">
-                      {time}
-                    </span>
-                  </div>
-                  <p className="pixel-text text-[9px] lg:text-xs text-gray-700 italic leading-relaxed">
-                    {entry.text}
-                  </p>
+                <div>
+                  <div className="text-sm font-semibold text-stone-800">{agentName}</div>
+                  <div className="text-xs text-stone-400">{time}</div>
                 </div>
               </div>
+              <p className="text-sm text-stone-600 italic leading-relaxed">{entry.text}</p>
             </div>
           );
         })}

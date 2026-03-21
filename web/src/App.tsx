@@ -1,102 +1,125 @@
 import { useState } from 'react';
-import { PixelRoomGrid } from './components/PixelRoomGrid';
 import { ChatPanel } from './components/ChatPanel';
+import { LayoutGrid, Users, MessageSquare, Settings } from 'lucide-react';
 
-type MobileView = 'village' | 'chat' | 'diary' | 'status';
+export type ActiveTab = 'overview' | 'directory' | 'logs' | 'system';
+
+const NAV_ITEMS: { id: ActiveTab; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
+  { id: 'overview', label: 'Overview', icon: LayoutGrid },
+  { id: 'directory', label: 'Directory', icon: Users },
+  { id: 'logs', label: 'Logs', icon: MessageSquare },
+  { id: 'system', label: 'System', icon: Settings },
+];
 
 export function App() {
-  const [mobileView, setMobileView] = useState<MobileView>('village');
-
-  // Map mobile view to ChatPanel tab
-  const chatPanelTab = mobileView === 'diary' ? 'diary'
-    : mobileView === 'status' ? 'status'
-    : 'chat';
-
-  const showChatPanel = mobileView !== 'village';
+  const [activeTab, setActiveTab] = useState<ActiveTab>('overview');
 
   return (
-    <div
-      className="w-screen h-screen flex flex-col lg:flex-row overflow-hidden"
-      style={{ backgroundImage: 'url(/backgroundImage.jpg)', backgroundSize: 'cover', backgroundPosition: 'center' }}
-    >
-      {/* Room Grid */}
-      <div
-        className={`w-full lg:w-3/5 flex-1 min-h-0 flex items-start lg:items-center justify-center p-2 lg:p-4 overflow-auto pt-3 lg:pt-4 ${
-          showChatPanel ? 'hidden lg:flex' : ''
-        }`}
+    <div className="flex h-screen bg-stone-50 overflow-hidden">
+      {/* Sidebar — desktop only */}
+      <aside
+        className="hidden lg:flex flex-col w-56 flex-shrink-0"
+        style={{ backgroundColor: '#2B4A35' }}
       >
-        <PixelRoomGrid />
-      </div>
+        <div className="px-5 py-5 border-b border-white/10">
+          <div className="flex items-center gap-2.5">
+            <div
+              className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 text-base leading-none"
+              style={{ backgroundColor: 'rgba(255,255,255,0.15)' }}
+            >
+              🏘
+            </div>
+            <div>
+              <h1 className="text-sm font-semibold text-white tracking-wide leading-tight">CubeWorld</h1>
+              <p className="text-[10px] mt-0.5" style={{ color: '#9ECBA9' }}>
+                AI Village Simulation
+              </p>
+            </div>
+          </div>
+        </div>
 
-      {/* Chat Panel */}
-      <div
-        className={`w-full lg:w-2/5 lg:h-full flex-1 lg:flex-shrink-0 min-h-0 ${
-          !showChatPanel ? 'hidden lg:block' : ''
-        }`}
-      >
-        <ChatPanel mobileTab={chatPanelTab} />
-      </div>
+        <nav className="flex-1 p-3 space-y-0.5">
+          {NAV_ITEMS.map(({ id, label, icon: Icon }) => (
+            <button
+              key={id}
+              onClick={() => setActiveTab(id)}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors text-left ${
+                activeTab === id
+                  ? 'text-white'
+                  : 'hover:text-white'
+              }`}
+              style={{
+                backgroundColor: activeTab === id ? 'rgba(255,255,255,0.18)' : undefined,
+                color: activeTab === id ? undefined : '#9ECBA9',
+              }}
+            >
+              <Icon className="w-4 h-4 flex-shrink-0" />
+              {label}
+            </button>
+          ))}
+        </nav>
 
-      {/* Mobile bottom navigation - pixel art themed */}
-      <nav className="lg:hidden flex-shrink-0 mobile-bottom-nav safe-area-inset-bottom">
-        <button
-          onClick={() => setMobileView('village')}
-          className={`mobile-nav-btn ${mobileView === 'village' ? 'active' : ''}`}
+        <div className="px-5 py-4 border-t border-white/10">
+          <p className="text-xs" style={{ color: '#6B9B77' }}>
+            CubeWorld 2.0
+          </p>
+        </div>
+      </aside>
+
+      {/* Main content */}
+      <div className="flex-1 flex flex-col min-w-0 min-h-0">
+        {/* Mobile header */}
+        <header
+          className="lg:hidden flex items-center px-4 py-3 flex-shrink-0"
+          style={{ backgroundColor: '#2B4A35' }}
         >
-          <span className="mobile-nav-icon">
-            <svg viewBox="0 0 16 16" className="w-5 h-5" fill="currentColor">
-              <rect x="1" y="8" width="14" height="7" rx="1" />
-              <polygon points="8,1 1,8 15,8" />
-              <rect x="6" y="10" width="4" height="5" />
-            </svg>
+          <div className="flex items-center gap-2">
+            <span className="text-lg">🏘</span>
+            <h1 className="text-sm font-semibold text-white">CubeWorld</h1>
+          </div>
+          <span className="ml-auto text-xs capitalize" style={{ color: '#9ECBA9' }}>
+            {activeTab}
           </span>
-          <span className="mobile-nav-label">VILLAGE</span>
-        </button>
-        <button
-          onClick={() => setMobileView('chat')}
-          className={`mobile-nav-btn ${mobileView === 'chat' ? 'active' : ''}`}
-        >
-          <span className="mobile-nav-icon">
-            <svg viewBox="0 0 16 16" className="w-5 h-5" fill="currentColor">
-              <rect x="1" y="2" width="14" height="9" rx="2" />
-              <polygon points="4,11 4,15 8,11" />
-              <rect x="4" y="5" width="2" height="2" fill="currentColor" className="text-indigo-300" />
-              <rect x="7" y="5" width="2" height="2" fill="currentColor" className="text-indigo-300" />
-              <rect x="10" y="5" width="2" height="2" fill="currentColor" className="text-indigo-300" />
-            </svg>
-          </span>
-          <span className="mobile-nav-label">CHAT</span>
-        </button>
-        <button
-          onClick={() => setMobileView('diary')}
-          className={`mobile-nav-btn ${mobileView === 'diary' ? 'active' : ''}`}
-        >
-          <span className="mobile-nav-icon">
-            <svg viewBox="0 0 16 16" className="w-5 h-5" fill="currentColor">
-              <rect x="3" y="1" width="11" height="14" rx="1" />
-              <rect x="1" y="1" width="3" height="14" rx="0.5" opacity="0.7" />
-              <rect x="6" y="4" width="6" height="1.5" fill="currentColor" className="text-amber-200" />
-              <rect x="6" y="7" width="6" height="1.5" fill="currentColor" className="text-amber-200" />
-              <rect x="6" y="10" width="4" height="1.5" fill="currentColor" className="text-amber-200" />
-            </svg>
-          </span>
-          <span className="mobile-nav-label">DIARY</span>
-        </button>
-        <button
-          onClick={() => setMobileView('status')}
-          className={`mobile-nav-btn ${mobileView === 'status' ? 'active' : ''}`}
-        >
-          <span className="mobile-nav-icon">
-            <svg viewBox="0 0 16 16" className="w-5 h-5" fill="currentColor">
-              <circle cx="8" cy="5" r="3.5" />
-              <rect x="3" y="10" width="10" height="5" rx="2" />
-              <circle cx="6" cy="4.5" r="0.8" fill="currentColor" className="text-indigo-300" />
-              <circle cx="10" cy="4.5" r="0.8" fill="currentColor" className="text-indigo-300" />
-            </svg>
-          </span>
-          <span className="mobile-nav-label">STATUS</span>
-        </button>
-      </nav>
+        </header>
+
+        {/* Desktop tab nav */}
+        <div className="hidden lg:flex items-center border-b border-stone-200 bg-white px-6 flex-shrink-0">
+          {NAV_ITEMS.map(({ id, label }) => (
+            <button
+              key={id}
+              onClick={() => setActiveTab(id)}
+              className={`px-4 py-3.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
+                activeTab === id
+                  ? 'border-emerald-600 text-emerald-700'
+                  : 'border-transparent text-stone-500 hover:text-stone-700 hover:border-stone-300'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {/* Content area */}
+        <main className="flex-1 min-h-0 overflow-hidden">
+          <ChatPanel activeSection={activeTab} />
+        </main>
+
+        {/* Mobile bottom nav */}
+        <nav className="lg:hidden flex border-t border-stone-200 bg-white flex-shrink-0">
+          {NAV_ITEMS.map(({ id, label, icon: Icon }) => (
+            <button
+              key={id}
+              onClick={() => setActiveTab(id)}
+              className={`flex-1 flex flex-col items-center gap-1 py-2.5 transition-colors ${
+                activeTab === id ? 'text-emerald-700' : 'text-stone-400'
+              }`}
+            >
+              <Icon className="w-5 h-5" />
+              <span className="text-[10px] font-medium">{label}</span>
+            </button>
+          ))}
+        </nav>
+      </div>
     </div>
   );
 }

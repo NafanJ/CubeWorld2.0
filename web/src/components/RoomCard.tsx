@@ -1,55 +1,76 @@
 import React from 'react';
+
+const COLOR_HEX: Record<string, string> = {
+  red: '#ef4444', orange: '#f97316', green: '#22c55e', blue: '#3b82f6',
+  purple: '#a855f7', teal: '#14b8a6', yellow: '#eab308', pink: '#ec4899',
+  indigo: '#6366f1', lime: '#84cc16', amber: '#f59e0b', rose: '#f43f5e',
+  cyan: '#06b6d4', sky: '#0ea5e9', violet: '#8b5cf6', emerald: '#10b981',
+  fuchsia: '#d946ef', slate: '#64748b',
+};
+
 interface RoomCardProps {
-  color: string;
-  characters?: string[]; // one-char avatars or image urls
-  usernames?: string[]; // names of agents in the room
+  characters?: string[];
+  usernames?: string[];
+  agentIds?: string[];
+  agentColorMap?: Record<string, string>;
   roomName?: string;
-  status: string;
   backgroundImage?: string;
 }
+
 export function RoomCard({
-  color,
   characters = [],
   usernames = [],
+  agentIds = [],
+  agentColorMap = {},
   roomName,
-  status,
-  backgroundImage
+  backgroundImage,
 }: RoomCardProps) {
-  const roomBgs = {
-    red: 'bg-amber-800',
-    orange: 'bg-orange-200',
-    green: 'bg-green-200',
-    blue: 'bg-slate-700',
-    purple: 'bg-orange-300',
-    teal: 'bg-teal-200'
-  };
-  return <div className="w-full h-full">
+  return (
+    <div className="w-full h-full">
       <div
-        className={`${!backgroundImage ? roomBgs[color as keyof typeof roomBgs] : ''} w-full h-full relative overflow-hidden pixel-room bg-cover bg-center rounded-lg lg:rounded-lg`}
-        style={backgroundImage ? { backgroundImage: `url(${backgroundImage})`, backgroundSize: 'cover', backgroundRepeat: 'no-repeat', backgroundPosition: 'center' } : undefined}
+        className="w-full h-full relative overflow-hidden rounded-xl bg-stone-300 bg-cover bg-center"
+        style={
+          backgroundImage
+            ? { backgroundImage: `url(${backgroundImage})`, backgroundSize: 'cover', backgroundPosition: 'center' }
+            : undefined
+        }
       >
-        {/* Characters (multiple avatars) */}
-        <div className="absolute bottom-2 lg:bottom-4 left-1/2 transform -translate-x-1/2 flex items-end gap-0.5 lg:gap-2">
-          {characters.map((c, i) => (
-            <div key={i} className={`w-8 h-8 lg:w-9 lg:h-9 rounded-full border-2 border-white bg-white/90 flex items-center justify-center text-xs lg:text-sm font-bold shadow-md ${i > 0 ? '-ml-1.5 lg:-ml-2' : ''}`} title={usernames[i] || ''}>
-              {c}
-            </div>
-          ))}
-        </div>
+        {/* Gradient overlay for readability */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-black/10 to-transparent" />
 
-        {/* Room name label (top-left) */}
+        {/* Room name */}
         {roomName && (
-          <div className="absolute top-1.5 left-1.5 lg:top-2 lg:left-2 bg-black/75 px-2 py-1 lg:px-2 lg:py-1 rounded-md border border-white/50 backdrop-blur-sm">
-            <p className="text-white text-[7px] lg:text-[8px] pixel-text leading-none">{roomName}</p>
+          <div className="absolute top-2 left-2 right-2">
+            <span className="inline-block bg-black/40 backdrop-blur-sm text-white text-[10px] lg:text-xs font-medium px-2 py-0.5 rounded-md">
+              {roomName}
+            </span>
           </div>
         )}
 
-        {/* Agent count badge on mobile when there are agents */}
+        {/* Agent avatars — bottom row */}
         {characters.length > 0 && (
-          <div className="lg:hidden absolute top-1.5 right-1.5 bg-indigo-600/90 text-white w-5 h-5 rounded-full flex items-center justify-center text-[8px] pixel-text font-bold border border-white/50">
-            {characters.length}
+          <div className="absolute bottom-2 left-2 right-2 flex items-center gap-1">
+            {characters.slice(0, 5).map((c, i) => {
+              const agentId = agentIds[i];
+              const colorName = agentId ? (agentColorMap[agentId] || 'slate') : 'slate';
+              const hex = COLOR_HEX[colorName] || '#64748b';
+              return (
+                <div
+                  key={i}
+                  className="w-7 h-7 lg:w-8 lg:h-8 rounded-full flex items-center justify-center text-white text-xs font-semibold flex-shrink-0 shadow-md border-2 border-white/50"
+                  style={{ backgroundColor: hex }}
+                  title={usernames[i] || ''}
+                >
+                  {c}
+                </div>
+              );
+            })}
+            {characters.length > 5 && (
+              <span className="text-[10px] text-white/80 font-medium">+{characters.length - 5}</span>
+            )}
           </div>
         )}
       </div>
-    </div>;
+    </div>
+  );
 }
