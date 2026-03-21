@@ -2,13 +2,14 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { ChatMessage } from './ChatMessage';
 import { supabase } from '../lib/supabase';
 import { PALETTE } from '../lib/colorUtils';
-import { ArrowLeft, ChevronDown, Send, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ArrowLeft, Send, ChevronRight } from 'lucide-react';
 
 type SupaMessage = {
   id: number;
   content: string;
   from_agent?: string | null;
   ts: string;
+  channel?: string;
 };
 
 function formatTime(iso?: string) {
@@ -17,23 +18,6 @@ function formatTime(iso?: string) {
     return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   } catch (e) {
     return iso;
-  }
-}
-
-function getDateKey(iso: string): string {
-  try {
-    return iso.split('T')[0];
-  } catch {
-    return '';
-  }
-}
-
-function formatDateHeader(dateKey: string): string {
-  try {
-    const date = new Date(dateKey + 'T00:00:00Z');
-    return date.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
-  } catch {
-    return dateKey;
   }
 }
 
@@ -74,12 +58,8 @@ export function ChatLogTab({ agentColorMap: parentAgentColorMap, agentNameMap, d
   const isDM = Boolean(dmAgentId);
   const [messages, setMessages] = useState<SupaMessage[]>([]);
   const [agentMap, setAgentMap] = useState<Record<string, string>>({});
-  const [selectedAgent, setSelectedAgent] = useState<string>('all');
   const [agentColorMap, setAgentColorMap] = useState<Record<string, string>>(parentAgentColorMap);
   const [loading, setLoading] = useState(true);
-  const [selectedDate, setSelectedDate] = useState<string>('');
-  const [availableDates, setAvailableDates] = useState<string[]>([]);
-  const [dayMessageCounts, setDayMessageCounts] = useState<Record<string, number>>({});
   const [userInput, setUserInput] = useState('');
   const [rooms, setRooms] = useState<RoomInfo[]>([]);
   const [sending, setSending] = useState(false);
@@ -124,11 +104,15 @@ export function ChatLogTab({ agentColorMap: parentAgentColorMap, agentNameMap, d
     }
   }, []);
 
+  const channelFilter = isDM && dmAgentId ? `dm:${dmAgentId}` : 'group';
+
   const loadMessages = useCallback(async (): Promise<SupaMessage[] | null> => {
     const { data, error } = await supabase
       .from('messages')
-      .select('id, content, from_agent, ts')
-      .order('ts', { ascending: false });
+      .select('id, content, from_agent, ts, channel')
+      .eq('channel', channelFilter)
+      .order('ts', { ascending: false })
+      .limit(200);
 
     if (error) {
       console.error('Error reloading messages', error);
@@ -140,27 +124,10 @@ export function ChatLogTab({ agentColorMap: parentAgentColorMap, agentNameMap, d
 
       if (!isMounted.current) return null;
       setMessages(ordered);
-
-      const dateToCount: Record<string, number> = {};
-      for (const msg of ordered) {
-        const dateKey = getDateKey(msg.ts);
-        if (dateKey) {
-          dateToCount[dateKey] = (dateToCount[dateKey] || 0) + 1;
-        }
-      }
-
-      const dates = Object.keys(dateToCount).sort().reverse();
-      setAvailableDates(dates);
-      setDayMessageCounts(dateToCount);
-
-      if (!selectedDate && dates.length > 0) {
-        setSelectedDate(dates[0]);
-      }
-
       return ordered;
     }
     return null;
-  }, [selectedDate]);
+  }, [channelFilter]);
 
   useEffect(() => {
     const initialLoad = async () => {
@@ -314,24 +281,42 @@ export function ChatLogTab({ agentColorMap: parentAgentColorMap, agentNameMap, d
     setSending(true);
     setUserInput('');
     try {
-      let sendText = text;
-      if (isDM && dmAgentName) {
-        const alreadyMentioned = new RegExp(`@${dmAgentName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(text);
-        if (!alreadyMentioned) sendText = `@${dmAgentName} ${text}`;
-      }
-
-      const mentions = parseMentions(sendText);
-      const hasMentions = mentions.agents.length > 0 || mentions.rooms.length > 0;
-
-      if (hasMentions) {
-        const { error } = await supabase.functions.invoke('reply', { body: { content: sendText, mentions } });
+      if (isDM && dmAgentId) {
+        // DM: always route through reply function with dm channel
+        const { error } = await supabase.functions.invoke('reply', {
+          body: { content: text, mentions: {}, channel: `dm:${dmAgentId}` },
+        });
         if (error) {
-          console.error('Error sending message:', error);
-          await supabase.from('messages').insert({ content: sendText, room_id: rooms.length > 0 ? rooms[0].id : null, from_agent: null });
+          console.error('Error sending DM:', error);
+          // Fallback: insert visitor message directly
+          await supabase.from('messages').insert({
+            content: text, room_id: rooms.length > 0 ? rooms[0].id : null,
+            from_agent: null, channel: `dm:${dmAgentId}`,
+          });
         }
       } else {
-        const { error } = await supabase.from('messages').insert({ content: sendText, room_id: rooms.length > 0 ? rooms[0].id : null, from_agent: null });
-        if (error) console.error('Error sending message:', error);
+        // Group chat
+        const mentions = parseMentions(text);
+        const hasMentions = mentions.agents.length > 0 || mentions.rooms.length > 0;
+
+        if (hasMentions) {
+          const { error } = await supabase.functions.invoke('reply', {
+            body: { content: text, mentions, channel: 'group' },
+          });
+          if (error) {
+            console.error('Error sending message:', error);
+            await supabase.from('messages').insert({
+              content: text, room_id: rooms.length > 0 ? rooms[0].id : null,
+              from_agent: null, channel: 'group',
+            });
+          }
+        } else {
+          const { error } = await supabase.from('messages').insert({
+            content: text, room_id: rooms.length > 0 ? rooms[0].id : null,
+            from_agent: null, channel: 'group',
+          });
+          if (error) console.error('Error sending message:', error);
+        }
       }
     } finally {
       setSending(false);
@@ -366,32 +351,9 @@ export function ChatLogTab({ agentColorMap: parentAgentColorMap, agentNameMap, d
     return () => { void supabase.removeChannel(channel); };
   }, [loadMessages]);
 
-  const filteredMessages = messages.filter((msg) => {
-    if (isDM && dmAgentId && dmAgentName) {
-      if (msg.from_agent === dmAgentId) return true;
-      if (!msg.from_agent) return msg.content.toLowerCase().includes('@' + dmAgentName.toLowerCase());
-      return false;
-    }
-    const msgDate = getDateKey(msg.ts);
-    if (msgDate !== selectedDate) return false;
-    if (selectedAgent === 'all') return true;
-    if (selectedAgent === 'anon') return !msg.from_agent;
-    return msg.from_agent === selectedAgent;
-  });
+  // Messages are already filtered by channel at the query level
+  const filteredMessages = messages;
 
-  const goToPreviousDay = useCallback(() => {
-    const idx = availableDates.indexOf(selectedDate);
-    if (idx < availableDates.length - 1) { setSelectedDate(availableDates[idx + 1]); initialLoadRef.current = true; }
-  }, [availableDates, selectedDate]);
-
-  const goToNextDay = useCallback(() => {
-    const idx = availableDates.indexOf(selectedDate);
-    if (idx > 0) { setSelectedDate(availableDates[idx - 1]); initialLoadRef.current = true; }
-  }, [availableDates, selectedDate]);
-
-  const goToToday = useCallback(() => {
-    if (availableDates.length > 0) { setSelectedDate(availableDates[0]); initialLoadRef.current = true; }
-  }, [availableDates]);
 
   useEffect(() => {
     if (messages.length === 0) return;
@@ -411,10 +373,6 @@ export function ChatLogTab({ agentColorMap: parentAgentColorMap, agentNameMap, d
   }, [handleScroll]);
 
   useEffect(() => { messagesRef.current = messages; }, [messages]);
-
-  const isToday = availableDates.length > 0 && selectedDate === availableDates[0];
-  const canGoBack = availableDates.length > 0 && selectedDate !== availableDates[availableDates.length - 1];
-  const canGoForward = availableDates.length > 0 && selectedDate !== availableDates[0];
 
   return (
     <>
@@ -439,7 +397,7 @@ export function ChatLogTab({ agentColorMap: parentAgentColorMap, agentNameMap, d
             <span className="font-semibold text-stone-900 text-sm">{dmAgentName}</span>
           </div>
         ) : (
-          <div className="flex items-center gap-3 flex-wrap">
+          <div className="flex items-center gap-3">
             {onBack && (
               <button
                 onClick={onBack}
@@ -449,56 +407,6 @@ export function ChatLogTab({ agentColorMap: parentAgentColorMap, agentNameMap, d
               </button>
             )}
             <span className="font-semibold text-stone-900 text-sm">Group Chat</span>
-
-            {/* Date nav */}
-            <div className="flex items-center gap-1 ml-2">
-              <button
-                onClick={goToPreviousDay}
-                disabled={!canGoBack}
-                className="p-1 rounded text-stone-400 hover:text-stone-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </button>
-              {selectedDate && (
-                <button
-                  onClick={goToToday}
-                  disabled={isToday}
-                  className="text-xs px-2 py-0.5 rounded-md text-stone-500 hover:bg-stone-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                >
-                  {isToday ? 'Today' : formatDateHeader(selectedDate)}
-                </button>
-              )}
-              <button
-                onClick={goToNextDay}
-                disabled={!canGoForward}
-                className="p-1 rounded text-stone-400 hover:text-stone-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-              >
-                <ChevronRight className="w-4 h-4" />
-              </button>
-              {selectedDate && dayMessageCounts[selectedDate] !== undefined && (
-                <span className="text-xs text-stone-400">
-                  ({dayMessageCounts[selectedDate]})
-                </span>
-              )}
-            </div>
-
-            {/* Agent filter */}
-            <div className="relative ml-auto">
-              <select
-                value={selectedAgent}
-                onChange={(e) => setSelectedAgent(e.target.value)}
-                className="appearance-none bg-white border border-stone-200 rounded-lg pl-3 pr-7 py-1.5 text-xs text-stone-700 cursor-pointer focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-              >
-                <option value="all">All agents</option>
-                <option value="anon">Visitors</option>
-                {Object.entries(agentMap)
-                  .sort((a, b) => a[1].localeCompare(b[1]))
-                  .map(([id, name]) => (
-                    <option key={id} value={id}>{name}</option>
-                  ))}
-              </select>
-              <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-stone-400 pointer-events-none" />
-            </div>
           </div>
         )}
       </div>
@@ -523,11 +431,9 @@ export function ChatLogTab({ agentColorMap: parentAgentColorMap, agentNameMap, d
         )}
 
         {messages.length === 0 && !loading && (
-          <div className="p-8 text-center text-sm text-stone-400">No messages yet.</div>
-        )}
-
-        {messages.length > 0 && filteredMessages.length === 0 && (
-          <div className="p-8 text-center text-sm text-stone-400">No messages on this day.</div>
+          <div className="p-8 text-center text-sm text-stone-400">
+            {isDM ? 'Start a conversation…' : 'No messages yet.'}
+          </div>
         )}
 
         <div className="py-2">

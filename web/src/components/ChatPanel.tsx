@@ -103,7 +103,7 @@ export function ChatPanel({ activeSection, onRoomSelect }: ChatPanelProps) {
       {/* Overview — room grid */}
       <div
         style={{ display: activeSection === 'overview' ? 'flex' : 'none' }}
-        className={`flex-1 min-h-0 overflow-auto bg-stone-50 items-start lg:items-center justify-center p-4 lg:p-8${animatingSection === 'overview' ? ' tab-content-enter' : ''}`}
+        className={`flex-1 min-h-0 overflow-hidden bg-stone-50 items-start lg:items-center justify-center p-4 lg:p-6${animatingSection === 'overview' ? ' tab-content-enter' : ''}`}
       >
         <PixelRoomGrid agentColorMap={agentColorMap} onRoomSelect={handleRoomSelect} />
       </div>

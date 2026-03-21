@@ -51,13 +51,16 @@ export function ConversationList({ agentColorMap, agentNameMap, onSelect }: Conv
     return () => { isMounted.current = false; };
   }, []);
 
-  const computeLastMessages = (msgs: Array<{ id: number; content: string; ts: string; from_agent?: string | null }>) => {
+  const computeLastMessages = (msgs: Array<{ id: number; content: string; ts: string; from_agent?: string | null; channel?: string }>) => {
     const result: Record<string, LastMessage> = {};
     for (const msg of msgs) {
       const preview = { content: msg.content, ts: msg.ts };
-      result['group'] = preview;
-      if (msg.from_agent) {
-        result[msg.from_agent] = preview;
+      const ch = msg.channel ?? 'group';
+      if (ch === 'group') {
+        result['group'] = preview;
+      } else if (ch.startsWith('dm:')) {
+        const agentId = ch.replace('dm:', '');
+        result[agentId] = preview;
       }
     }
     return result;
@@ -69,13 +72,13 @@ export function ConversationList({ agentColorMap, agentNameMap, onSelect }: Conv
       setLoading(true);
       const { data, error } = await supabase
         .from('messages')
-        .select('id, content, ts, from_agent')
+        .select('id, content, ts, from_agent, channel')
         .order('ts', { ascending: true })
         .limit(500);
 
       if (!mounted) return;
       if (!error && data) {
-        setLastMessages(computeLastMessages(data as Array<{ id: number; content: string; ts: string; from_agent?: string | null }>));
+        setLastMessages(computeLastMessages(data as Array<{ id: number; content: string; ts: string; from_agent?: string | null; channel?: string }>));
       }
       setLoading(false);
     };
@@ -90,12 +93,18 @@ export function ConversationList({ agentColorMap, agentNameMap, onSelect }: Conv
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'messages' },
         (payload: any) => {
-          const msg = payload.new as { id: number; content: string; ts: string; from_agent?: string | null };
+          const msg = payload.new as { id: number; content: string; ts: string; from_agent?: string | null; channel?: string };
           if (!isMounted.current) return;
           const preview = { content: msg.content, ts: msg.ts };
+          const ch = msg.channel ?? 'group';
           setLastMessages((prev) => {
-            const next = { ...prev, group: preview };
-            if (msg.from_agent) next[msg.from_agent] = preview;
+            const next = { ...prev };
+            if (ch === 'group') {
+              next['group'] = preview;
+            } else if (ch.startsWith('dm:')) {
+              const agentId = ch.replace('dm:', '');
+              next[agentId] = preview;
+            }
             return next;
           });
         }
@@ -170,7 +179,7 @@ export function ConversationList({ agentColorMap, agentNameMap, onSelect }: Conv
                   <div className="flex-1 min-w-0">
                     <div className="text-sm font-semibold text-stone-900 mb-0.5">{name}</div>
                     <div className="text-xs text-stone-400 truncate">
-                      {last ? truncate(last.content) : 'No messages yet'}
+                      {last ? truncate(last.content) : 'Start a conversation'}
                     </div>
                   </div>
                   {last && (

@@ -117,34 +117,23 @@ async function getRooms(): Promise<Map<string, Room>> {
   return roomMap;
 }
 
-async function getRecentMessagesByAgent(
-  limitPerAgent = 10
-): Promise<Map<string, MessageSummary[]>> {
-  const historyByAgent = new Map<string, MessageSummary[]>();
-
+async function getRecentGroupMessages(
+  limit = 30
+): Promise<MessageSummary[]> {
   const { data, error } = await supabase
     .from("messages")
     .select("id, ts, from_agent, room_id, content")
+    .eq("channel", "group")
     .order("ts", { ascending: false })
-    .limit(200);
+    .limit(limit);
 
   if (error) {
-    console.error("Error fetching recent messages:", error);
-    return historyByAgent;
+    console.error("Error fetching recent group messages:", error);
+    return [];
   }
 
-  for (const row of (data ?? []) as MessageSummary[]) {
-    const key = row.from_agent;
-    if (!key) continue;
-
-    const arr = historyByAgent.get(key) ?? [];
-    if (arr.length >= limitPerAgent) continue;
-
-    arr.push(row);
-    historyByAgent.set(key, arr);
-  }
-
-  return historyByAgent;
+  // Return in chronological order (oldest first)
+  return ((data ?? []) as MessageSummary[]).reverse();
 }
 
 async function getRelationships(): Promise<Map<string, Map<string, number>>> {
@@ -176,6 +165,7 @@ async function getRecentUserMessages(): Promise<MessageSummary[]> {
   const { data, error } = await supabase
     .from("messages")
     .select("id, ts, from_agent, room_id, content")
+    .eq("channel", "group")
     .is("from_agent", null)
     .gte("ts", fiveMinutesAgo)
     .order("ts", { ascending: false })
@@ -385,7 +375,8 @@ interface GenerateResult {
 
 async function generateMessage(
   agent: Agent,
-  history: MessageSummary[],
+  groupHistory: MessageSummary[],
+  nameMap: Map<string, string>,
   room: Room | undefined,
   extraContext: string = ""
 ): Promise<GenerateResult> {
@@ -429,17 +420,20 @@ async function generateMessage(
 
   const roomName = room?.name ?? "your small apartment";
 
-  const recentLines = history
-    .map((m) => m.content?.trim())
-    .filter((c): c is string => !!c)
-    .slice(0, 20);
+  // Format group chat history with sender names
+  const chatLines = groupHistory
+    .map((m) => {
+      const sender = m.from_agent ? (nameMap.get(m.from_agent) ?? "Someone") : "Visitor";
+      return `- ${sender}: ${m.content?.trim() ?? "..."}`;
+    })
+    .filter((c) => c.length > 5);
 
-  const recentHistoryText =
-    recentLines.length > 0
-      ? recentLines.map((c) => `- ${c}`).join("\n")
-      : "(no recent actions recorded yet)";
+  const groupChatText =
+    chatLines.length > 0
+      ? chatLines.join("\n")
+      : "(the group chat is quiet right now)";
 
-  let varietyInstructions = "Avoid repeating the exact same actions or wording as above.";
+  let varietyInstructions = "Avoid repeating what someone else just said or doing the exact same actions.";
 
   if (interests.length > 0 && Math.random() > 0.7) {
     varietyInstructions += ` Occasionally relate your actions to your interests: ${interests.join(", ")}.`;
@@ -458,22 +452,24 @@ Your current energy: ${agent.energy}/5.
 ${personalityPrompt}
 ${extraContext}
 
-Here are the last few things you have been doing recently (newest first):
+Here is the recent group chat (oldest first). Everyone in the village can see these messages:
 
-${recentHistoryText}
+${groupChatText}
 
-Now decide what to do this tick:
+Now decide what to do or say next. You can:
+- Respond to something another villager said or did
+- Address someone by name
+- Do your own thing independently
+- React to what's happening around you in ${roomName}
 
-- Choose to describe a tiny new action.
-
-Reply with a JSON object: {"message": "<your one-line action>", "mood_delta": <-1, 0, or 1>}
-The message should be ONE short, present-tense line (max ~80 characters)
-describing what you are doing right now in this room.
-mood_delta should reflect how this action makes you feel (-1 worse, 0 same, 1 better).
+Reply with a JSON object: {"message": "<your one-line action or speech>", "mood_delta": <-1, 0, or 1>}
+The message should be ONE short, present-tense line (max ~100 characters).
+You can include speech like: ${agent.name} says "..." or describe an action.
+mood_delta should reflect how this makes you feel (-1 worse, 0 same, 1 better).
 
 Keep it gentle, slice-of-life, and grounded.
 ${varietyInstructions}
-No emojis, no dialogue in the message. Always write in third person perspective.
+No emojis. Always write in third person perspective.
 Reply with ONLY the JSON object. Nothing else.
 `;
 
@@ -539,97 +535,6 @@ Reply with ONLY the JSON object. Nothing else.
     }
 
     return randomCosyLine();
-  }
-}
-
-/* ------------------------------------------------------------------ */
-/*  Conversation generation                                            */
-/* ------------------------------------------------------------------ */
-
-async function generateConversationMessage(
-  agent: Agent,
-  otherAgent: Agent,
-  previousMessage: string | null,
-  history: MessageSummary[],
-  room: Room | undefined,
-  affinity: number
-): Promise<GenerateResult> {
-  if (!openai) {
-    return { message: `${agent.name} nods quietly.`, mood_delta: 0 };
-  }
-
-  const persona = agent.persona ?? {};
-  const traits = persona.traits ?? [];
-  const roomName = room?.name ?? "a room";
-  const relationship = affinityDescription(affinity);
-
-  let conversationContext: string;
-  if (previousMessage) {
-    conversationContext = `${otherAgent.name} just said/did: "${previousMessage}"\nRespond naturally to them.`;
-  } else {
-    conversationContext = `You see ${otherAgent.name} (${relationship}) in the room. Say or do something directed at them.`;
-  }
-
-  const recentLines = history
-    .map((m) => m.content?.trim())
-    .filter((c): c is string => !!c)
-    .slice(0, 10);
-
-  const recentHistoryText =
-    recentLines.length > 0
-      ? recentLines.map((c) => `- ${c}`).join("\n")
-      : "(no recent actions)";
-
-  const prompt = `
-You are ${agent.name}, a cosy villager in Cozy Village.
-Your traits: ${traits.join(", ") || "versatile"}.
-You are in "${roomName}" with ${otherAgent.name}, ${relationship}.
-Your mood: ${agent.mood}, energy: ${agent.energy}/5.
-
-Recent history:
-${recentHistoryText}
-
-${conversationContext}
-
-Reply with JSON: {"message": "<action or speech, ~80 chars>", "mood_delta": <-1, 0, or 1>}
-Write in third person. Can include speech like: ${agent.name} says "..."
-Keep it gentle and grounded. No emojis. ONLY the JSON object.
-`;
-
-  try {
-    const response = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [
-        {
-          role: "system",
-          content: `You are ${agent.name}. Generate a conversational action or speech directed at ${otherAgent.name}. Always respond with valid JSON: {"message": "...", "mood_delta": -1|0|1}`
-        },
-        { role: "user", content: prompt }
-      ],
-      temperature: 0.85 + (Math.random() * 0.3)
-    });
-
-    const raw = response.choices[0]?.message?.content?.trim() ?? "";
-    if (!raw) return { message: `${agent.name} glances at ${otherAgent.name}.`, mood_delta: 0 };
-
-    try {
-      const parsed = JSON.parse(raw);
-      if (typeof parsed.message === "string" && parsed.message.trim()) {
-        const delta = typeof parsed.mood_delta === "number"
-          ? clamp(Math.round(parsed.mood_delta), -1, 1)
-          : 0;
-        return { message: parsed.message.trim(), mood_delta: delta };
-      }
-    } catch {
-      if (raw.length > 0 && raw.length < 200) {
-        return { message: raw, mood_delta: 0 };
-      }
-    }
-
-    return { message: `${agent.name} smiles at ${otherAgent.name}.`, mood_delta: 0 };
-  } catch (err: unknown) {
-    console.error("Conversation generation error:", (err as Error)?.message ?? String(err));
-    return { message: `${agent.name} nods at ${otherAgent.name}.`, mood_delta: 0 };
   }
 }
 
@@ -724,11 +629,17 @@ serve(async (req: Request) => {
     }
 
     const agents = await getAgents();
-    const historyByAgent = await getRecentMessagesByAgent(10);
+    const groupHistory = await getRecentGroupMessages(30);
     const roomsMap = await getRooms();
     const relationships = await getRelationships();
     const userMessages = await getRecentUserMessages();
     const tickCount = await getTickCount();
+
+    // Build agent name map for formatting chat history
+    const nameMap = new Map<string, string>();
+    for (const agent of agents) {
+      nameMap.set(agent.id, agent.name);
+    }
 
     let inserted = 0;
     const movedAgents = new Set<string>();
@@ -852,6 +763,7 @@ serve(async (req: Request) => {
               room_id: nextRoomId,
               content: movementMsg,
               mood_tag: "neutral",
+              channel: "group",
             });
 
             if (msgErr) {
@@ -903,140 +815,13 @@ serve(async (req: Request) => {
     const updatedRelationships = await getRelationships();
 
     // ----------------------------------------------------------
-    // Phase 3: Agent-to-agent conversations + solo messages
+    // Phase 3: Independent agent messages to group chat
     // ----------------------------------------------------------
     const refreshedAgents = await getAgents();
 
-    // Rebuild room groupings with refreshed data
-    const refreshedByRoom = new Map<string, Agent[]>();
-    for (const agent of refreshedAgents) {
-      if (!agent.room_id || movedAgents.has(agent.id)) continue;
-      const list = refreshedByRoom.get(agent.room_id) ?? [];
-      list.push(agent);
-      refreshedByRoom.set(agent.room_id, list);
-    }
-
-    const conversedAgents = new Set<string>();
-
-    // Handle conversations in rooms with 2+ non-moved agents
-    for (const [roomId, roomAgents] of refreshedByRoom) {
-      if (roomAgents.length < 2) continue;
-
-      // Find agents with energy > 0
-      const availableAgents = roomAgents.filter((a) => a.energy > 0);
-      if (availableAgents.length < 2) continue;
-
-      // Pick the pair with highest mutual affinity
-      let bestPair: [Agent, Agent] | null = null;
-      let bestAffinity = -Infinity;
-
-      for (let i = 0; i < availableAgents.length; i++) {
-        for (let j = i + 1; j < availableAgents.length; j++) {
-          const aRels = updatedRelationships.get(availableAgents[i].id);
-          const affinity = aRels?.get(availableAgents[j].id) ?? 0;
-          if (affinity > bestAffinity) {
-            bestAffinity = affinity;
-            bestPair = [availableAgents[i], availableAgents[j]];
-          }
-        }
-      }
-
-      if (!bestPair) continue;
-
-      const [agentA, agentB] = bestPair;
-      const room = roomsMap.get(roomId);
-      const affinity = bestAffinity;
-
-      // Build extra context for user messages in this room
-      const roomUserMsgs = userMessages.filter((m) => m.room_id === roomId);
-      let userContext = "";
-      if (roomUserMsgs.length > 0) {
-        const userLines = roomUserMsgs
-          .map((m) => m.content?.trim())
-          .filter((c): c is string => !!c)
-          .slice(0, 3);
-        if (userLines.length > 0) {
-          userContext = `\nA visitor in the room said: "${userLines.join('" and "')}"\nYou may acknowledge or respond to the visitor.\n`;
-        }
-      }
-
-      // Turn 1: Agent A initiates
-      const historyA = historyByAgent.get(agentA.id) ?? [];
-      const turn1 = await generateConversationMessage(
-        agentA, agentB, null, historyA, room, affinity
-      );
-
-      const { error: msg1Err } = await supabase.from("messages").insert({
-        from_agent: agentA.id,
-        room_id: roomId,
-        content: turn1.message,
-        mood_tag: moodTagFromDelta(turn1.mood_delta),
-      });
-      if (!msg1Err) inserted += 1;
-
-      // Update Agent A mood/energy
-      const newMoodA = clamp(agentA.mood + turn1.mood_delta, -5, 5);
-      const newEnergyA = clamp(agentA.energy - 1, 0, 5);
-      await supabase.from("agents").update({
-        mood: newMoodA,
-        energy: newEnergyA,
-        last_tick_at: new Date().toISOString(),
-      }).eq("id", agentA.id);
-
-      // Turn 2: Agent B responds
-      const historyB = historyByAgent.get(agentB.id) ?? [];
-      const turn2 = await generateConversationMessage(
-        agentB, agentA, turn1.message, historyB, room, affinity
-      );
-
-      const { error: msg2Err } = await supabase.from("messages").insert({
-        from_agent: agentB.id,
-        room_id: roomId,
-        content: turn2.message,
-        mood_tag: moodTagFromDelta(turn2.mood_delta),
-      });
-      if (!msg2Err) inserted += 1;
-
-      // Update Agent B mood/energy
-      const newMoodB = clamp(agentB.mood + turn2.mood_delta, -5, 5);
-      const newEnergyB = clamp(agentB.energy - 1, 0, 5);
-      await supabase.from("agents").update({
-        mood: newMoodB,
-        energy: newEnergyB,
-        last_tick_at: new Date().toISOString(),
-      }).eq("id", agentB.id);
-
-      // Turn 3: 30% chance Agent A replies
-      if (Math.random() <= 0.3 && newEnergyA > 0) {
-        const turn3 = await generateConversationMessage(
-          agentA, agentB, turn2.message, historyA, room, affinity
-        );
-
-        const { error: msg3Err } = await supabase.from("messages").insert({
-          from_agent: agentA.id,
-          room_id: roomId,
-          content: turn3.message,
-          mood_tag: moodTagFromDelta(turn3.mood_delta),
-        });
-        if (!msg3Err) inserted += 1;
-
-        const finalMoodA = clamp(newMoodA + turn3.mood_delta, -5, 5);
-        const finalEnergyA = clamp(newEnergyA - 1, 0, 5);
-        await supabase.from("agents").update({
-          mood: finalMoodA,
-          energy: finalEnergyA,
-        }).eq("id", agentA.id);
-      }
-
-      conversedAgents.add(agentA.id);
-      conversedAgents.add(agentB.id);
-    }
-
-    // Solo messages for remaining agents
     for (const agent of refreshedAgents) {
       if (!agent.room_id) continue;
       if (movedAgents.has(agent.id)) continue;
-      if (conversedAgents.has(agent.id)) continue;
 
       const room = roomsMap.get(agent.room_id);
 
@@ -1055,6 +840,7 @@ serve(async (req: Request) => {
           room_id: agent.room_id,
           content: restMsg,
           mood_tag: "neutral",
+          channel: "group",
         });
         if (!error) inserted += 1;
 
@@ -1070,22 +856,18 @@ serve(async (req: Request) => {
         continue;
       }
 
-      // Build extra context
-      let extraContext = "";
-
-      // Add user message awareness
-      const roomUserMsgs = userMessages.filter((m) => m.room_id === agent.room_id);
-      if (roomUserMsgs.length > 0) {
-        const userLines = roomUserMsgs
-          .map((m) => m.content?.trim())
-          .filter((c): c is string => !!c)
-          .slice(0, 3);
-        if (userLines.length > 0) {
-          extraContext += `\nA visitor in the room said: "${userLines.join('" and "')}"\nYou may choose to respond to the visitor or continue your own activities.\n`;
-        }
+      // Random skip (~30%) for natural gaps — not every agent posts every tick
+      if (Math.random() < 0.3) {
+        // Still update alone ticks even if skipping
+        await supabase.from("agents").update({
+          memory: { ...memory, alone_ticks: aloneTicks },
+        }).eq("id", agent.id);
+        continue;
       }
 
-      // Add relationship context for agents in the same room
+      // Build extra context: room companions + relationships
+      let extraContext = "";
+
       const sameRoomAgents = (agentsByRoom.get(agent.room_id) ?? [])
         .filter((a) => a.id !== agent.id);
       if (sameRoomAgents.length > 0) {
@@ -1097,14 +879,14 @@ serve(async (req: Request) => {
         extraContext += `\nYou are in the room with: ${othersContext.join(", ")}.\n`;
       }
 
-      const history = historyByAgent.get(agent.id) ?? [];
-      const result = await generateMessage(agent, history, room, extraContext);
+      const result = await generateMessage(agent, groupHistory, nameMap, room, extraContext);
 
       const { error } = await supabase.from("messages").insert({
         from_agent: agent.id,
         room_id: agent.room_id,
         content: result.message,
         mood_tag: moodTagFromDelta(result.mood_delta),
+        channel: "group",
       });
 
       if (error) {
@@ -1162,8 +944,9 @@ serve(async (req: Request) => {
       // Skip if already wrote a diary this cycle
       if (memory.last_diary_tick && memory.last_diary_tick >= tickCount - 5) continue;
 
-      const history = historyByAgent.get(agent.id) ?? [];
-      const diaryText = await generateDiaryEntry(agent, history);
+      // Filter group history to this agent's messages for diary context
+      const agentHistory = groupHistory.filter((m) => m.from_agent === agent.id);
+      const diaryText = await generateDiaryEntry(agent, agentHistory);
 
       if (diaryText) {
         const { error } = await supabase.from("diary_entries").insert({

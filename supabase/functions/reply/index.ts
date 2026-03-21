@@ -86,12 +86,25 @@ function buildPersonalityPrompt(persona: Persona | null): string {
 async function generateReply(
   agent: Agent,
   visitorMessage: string,
-  roomName: string
+  roomName: string,
+  isDM: boolean = false,
+  dmHistory: string = ""
 ): Promise<string> {
   if (!openai) return `${agent.name} waves at the visitor.`;
 
   const personalityPrompt = buildPersonalityPrompt(agent.persona);
   const traits = agent.persona?.traits ?? [];
+
+  let contextBlock = "";
+  if (isDM) {
+    contextBlock = `You are in a private conversation with a visitor. Only you and the visitor can see these messages.`;
+    if (dmHistory) {
+      contextBlock += `\n\nRecent conversation history:\n${dmHistory}`;
+    }
+    contextBlock += `\n\nThe visitor just said: "${visitorMessage}"`;
+  } else {
+    contextBlock = `A visitor just said to you in the group chat: "${visitorMessage}"`;
+  }
 
   const prompt = `
 You are a cosy, low-key villager called ${agent.name} in a tiny 2x3 apartment block called Cozy Village.
@@ -100,7 +113,7 @@ Your current mood: ${agent.mood} (scale: -5 very sad to 5 very happy).
 Your current energy: ${agent.energy}/5.
 ${personalityPrompt}
 
-A visitor just said to you: "${visitorMessage}"
+${contextBlock}
 
 Respond naturally and in character. Keep it brief (1-2 sentences).
 Write in third person (e.g. "${agent.name} smiles and says '...'").
@@ -114,7 +127,7 @@ Reply with ONLY your response text, nothing else.
       messages: [
         {
           role: "system",
-          content: `You are ${agent.name} with these traits: ${traits.join(", ") || "versatile"}. A visitor is talking to you. Respond briefly and in character, in third person.`,
+          content: `You are ${agent.name} with these traits: ${traits.join(", ") || "versatile"}. A visitor is talking to you${isDM ? " privately" : " in the group chat"}. Respond briefly and in character, in third person.`,
         },
         { role: "user", content: prompt },
       ],
@@ -168,6 +181,7 @@ serve(async (req: Request) => {
     const content: string = (body.content ?? "").trim();
     const mentions: { agents?: string[]; rooms?: string[] } =
       body.mentions ?? {};
+    const channel: string = body.channel ?? "group";
 
     if (!content) {
       return new Response(
@@ -175,6 +189,8 @@ serve(async (req: Request) => {
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+
+    const isDM = channel.startsWith("dm:");
 
     // Fetch all active agents and rooms
     const [agentsRes, roomsRes] = await Promise.all([
@@ -191,85 +207,114 @@ serve(async (req: Request) => {
       allRooms.map((r) => [r.name.toLowerCase(), r])
     );
 
+    let respondingAgents: Agent[] = [];
 
-    // Resolve mentioned agents by name (case-insensitive)
-    const targetAgents: Agent[] = [];
-    const mentionedAgentNames = (mentions.agents ?? []).map((n) =>
-      n.toLowerCase()
-    );
-    const mentionedRoomNames = (mentions.rooms ?? []).map((n) =>
-      n.toLowerCase()
-    );
-
-    // @everyone → all active agents
-    const isEveryone = mentionedAgentNames.includes("everyone");
-
-    if (isEveryone) {
-      for (const agent of allAgents) {
-        if (agent.is_active) targetAgents.push(agent);
-      }
+    if (isDM) {
+      // DM: target agent is identified by channel
+      const dmAgentId = channel.replace("dm:", "");
+      const dmAgent = allAgents.find((a) => a.id === dmAgentId);
+      if (dmAgent) respondingAgents = [dmAgent];
     } else {
-      // Direct agent mentions
-      for (const name of mentionedAgentNames) {
-        const agent = allAgents.find((a) => a.name.toLowerCase() === name);
-        if (agent && !targetAgents.find((t) => t.id === agent.id)) {
-          targetAgents.push(agent);
-        }
-      }
+      // Group chat: resolve mentions
+      const targetAgents: Agent[] = [];
+      const mentionedAgentNames = (mentions.agents ?? []).map((n) =>
+        n.toLowerCase()
+      );
+      const mentionedRoomNames = (mentions.rooms ?? []).map((n) =>
+        n.toLowerCase()
+      );
 
-      // Room mentions → add agents in those rooms
-      for (const roomName of mentionedRoomNames) {
-        const room = roomByName.get(roomName);
-        if (room) {
-          const agentsInRoom = allAgents.filter((a) => a.room_id === room.id);
-          for (const agent of agentsInRoom) {
-            if (!targetAgents.find((t) => t.id === agent.id)) {
-              targetAgents.push(agent);
+      // @everyone → all active agents
+      const isEveryone = mentionedAgentNames.includes("everyone");
+
+      if (isEveryone) {
+        for (const agent of allAgents) {
+          if (agent.is_active) targetAgents.push(agent);
+        }
+      } else {
+        // Direct agent mentions
+        for (const name of mentionedAgentNames) {
+          const agent = allAgents.find((a) => a.name.toLowerCase() === name);
+          if (agent && !targetAgents.find((t) => t.id === agent.id)) {
+            targetAgents.push(agent);
+          }
+        }
+
+        // Room mentions → add agents in those rooms
+        for (const roomName of mentionedRoomNames) {
+          const room = roomByName.get(roomName);
+          if (room) {
+            const agentsInRoom = allAgents.filter((a) => a.room_id === room.id);
+            for (const agent of agentsInRoom) {
+              if (!targetAgents.find((t) => t.id === agent.id)) {
+                targetAgents.push(agent);
+              }
             }
           }
         }
       }
-    }
 
-    // Cap: 6 for @everyone announcements, 3 for targeted mentions
-    const maxAgents = isEveryone ? 6 : 3;
-    const respondingAgents = targetAgents.slice(0, maxAgents);
+      // Cap: 6 for @everyone announcements, 3 for targeted mentions
+      const maxAgents = isEveryone ? 6 : 3;
+      respondingAgents = targetAgents.slice(0, maxAgents);
+    }
 
     // Determine room for the user message
     let messageRoomId: string | null = null;
     if (respondingAgents.length > 0 && respondingAgents[0].room_id) {
       messageRoomId = respondingAgents[0].room_id;
-    } else if (mentionedRoomNames.length > 0) {
-      const room = roomByName.get(mentionedRoomNames[0]);
-      if (room) messageRoomId = room.id;
     }
     // Fallback to first room if nothing matched
     if (!messageRoomId && allRooms.length > 0) {
       messageRoomId = allRooms[0].id;
     }
 
-    // Insert user message
+    // Insert user message with channel
     const { error: msgErr } = await supabase.from("messages").insert({
       from_agent: null,
       room_id: messageRoomId,
       content,
+      channel,
     });
     if (msgErr) {
       console.error("[reply] Error inserting user message:", JSON.stringify(msgErr));
     }
 
-    // Generate replies from each mentioned agent
+    // For DMs, fetch conversation history for context
+    let dmHistory = "";
+    if (isDM) {
+      const { data: dmMessages } = await supabase
+        .from("messages")
+        .select("from_agent, content")
+        .eq("channel", channel)
+        .order("ts", { ascending: false })
+        .limit(20);
+
+      if (dmMessages && dmMessages.length > 0) {
+        const dmAgent = respondingAgents[0];
+        dmHistory = (dmMessages as Array<{ from_agent: string | null; content: string }>)
+          .reverse()
+          .map((m) => {
+            const sender = m.from_agent ? dmAgent.name : "Visitor";
+            return `- ${sender}: ${m.content}`;
+          })
+          .join("\n");
+      }
+    }
+
+    // Generate replies from each target agent
     let replies = 0;
     for (const agent of respondingAgents) {
       const room = agent.room_id ? roomMap.get(agent.room_id) : null;
       const roomName = room?.name ?? "the village";
-      const replyText = await generateReply(agent, content, roomName);
+      const replyText = await generateReply(agent, content, roomName, isDM, dmHistory);
 
       const { error: insertErr } = await supabase.from("messages").insert({
         from_agent: agent.id,
         room_id: agent.room_id ?? messageRoomId,
         content: replyText,
-        });
+        channel,
+      });
 
       if (insertErr) {
         console.error(`Error inserting reply from ${agent.name}:`, insertErr);

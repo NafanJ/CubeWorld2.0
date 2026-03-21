@@ -6,8 +6,8 @@ export type ActiveTab = 'overview' | 'directory' | 'logs' | 'system';
 
 const NAV_ITEMS: { id: ActiveTab; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
   { id: 'overview', label: 'Overview', icon: LayoutGrid },
+  { id: 'logs', label: 'Chats', icon: MessageSquare },
   { id: 'directory', label: 'Directory', icon: Users },
-  { id: 'logs', label: 'Logs', icon: MessageSquare },
   { id: 'system', label: 'System', icon: Settings },
 ];
 
@@ -81,23 +81,6 @@ export function App() {
             {activeTab}
           </span>
         </header>
-
-        {/* Desktop tab nav */}
-        <div className="hidden lg:flex items-center border-b border-stone-200 bg-white px-6 flex-shrink-0">
-          {NAV_ITEMS.map(({ id, label }) => (
-            <button
-              key={id}
-              onClick={() => setActiveTab(id)}
-              className={`px-4 py-3.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
-                activeTab === id
-                  ? 'border-emerald-600 text-emerald-700'
-                  : 'border-transparent text-stone-500 hover:text-stone-700 hover:border-stone-300'
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
 
         {/* Content area */}
         <main className="flex-1 min-h-0 overflow-hidden">

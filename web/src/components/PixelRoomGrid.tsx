@@ -128,11 +128,11 @@ export const PixelRoomGrid: React.FC<PixelRoomGridProps> = ({ agentColorMap = {}
           ))}
         </div>
         {/* Desktop skeleton */}
-        <div className="hidden lg:grid grid-cols-7 gap-3 max-w-5xl w-full auto-rows-fr">
+        <div className="hidden lg:grid grid-cols-7 grid-rows-3 gap-3 w-full h-full max-h-full">
           {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((i) => {
             const isElevatorPos = i === 2 || i === 5 || i === 8;
             return (
-              <div key={i} className={isElevatorPos ? 'col-span-1' : 'aspect-video col-span-3'}>
+              <div key={i} className={isElevatorPos ? 'col-span-1 min-h-0' : 'col-span-3 min-h-0'}>
                 <div className="w-full h-full bg-stone-200 rounded-xl animate-pulse" />
               </div>
             );
@@ -162,9 +162,9 @@ export const PixelRoomGrid: React.FC<PixelRoomGridProps> = ({ agentColorMap = {}
       </div>
 
       {/* Desktop: 7-column grid with elevator columns */}
-      <div className="hidden lg:grid grid-cols-7 gap-3 max-w-5xl w-full auto-rows-fr">
+      <div className="hidden lg:grid grid-cols-7 grid-rows-3 gap-3 w-full h-full max-h-full">
         {rooms.map((room) => (
-          <div key={room.id} className={room.isElevator ? 'col-span-1' : 'aspect-video col-span-3'}>
+          <div key={room.id} className={room.isElevator ? 'col-span-1 min-h-0' : 'col-span-3 min-h-0'}>
             {room.isElevator ? (
               <ElevatorCard
                 characters={room.characters}
