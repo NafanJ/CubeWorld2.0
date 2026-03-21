@@ -7,6 +7,12 @@ import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 // @ts-expect-error Deno module resolution
 import OpenAI from "https://deno.land/x/openai@v4.24.0/mod.ts";
+import {
+  type AgentMemory,
+  formatMemoryForPrompt,
+  appendJournal,
+  addFact,
+} from "../_shared/memory.ts";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -18,10 +24,6 @@ interface Persona {
   quirks?: string[];
   speechPatterns?: string[];
   communicationStyle?: string;
-}
-
-interface AgentMemory {
-  alone_ticks?: number;
 }
 
 interface Agent {
@@ -184,6 +186,8 @@ function moodTagFromDelta(delta: number): string {
 interface GenerateResult {
   message: string;
   mood_delta: number;
+  journal?: string | null;
+  new_fact?: string | null;
 }
 
 async function generateMessage(
@@ -255,11 +259,13 @@ async function generateMessage(
     varietyInstructions += " Feel free to briefly wonder about something.";
   }
 
+  const memoryBlock = formatMemoryForPrompt(agent.memory);
+
   const prompt = `
 You are ${agent.name}. You live in Cozy Village with your friends.
 You're in "${roomName}" right now. Mood: ${agent.mood}/5. Energy: ${agent.energy}/5.
 ${personalityPrompt}
-${extraContext}
+${memoryBlock}${extraContext}
 
 Recent group chat:
 
@@ -276,8 +282,10 @@ Rules:
 - Don't be poetic or philosophical. Be normal. Be chill.
 - No emojis.
 
-JSON only: {"message": "<your message>", "mood_delta": <-1, 0, or 1>}
-Max ~80 chars. ${varietyInstructions}
+JSON only: {"message": "<your message>", "mood_delta": <-1, 0, or 1>, "journal": "<1-line summary of this moment, or null>", "new_fact": "<an important fact worth remembering, or null>"}
+- journal: a short note about what just happened (e.g. "Talked with Pip about his bookshelf project")
+- new_fact: something you learned or decided that you'd want to remember later (e.g. "Pip is building a bookshelf from reclaimed wood"). Only include if genuinely noteworthy.
+Max ~80 chars for the message. ${varietyInstructions}
 `;
 
   async function callOnce(): Promise<GenerateResult | null> {
@@ -286,7 +294,7 @@ Max ~80 chars. ${varietyInstructions}
       messages: [
         {
           role: "system",
-          content: `You are ${agent.name}. Traits: ${traits.join(", ") || "chill"}. You're texting your friends in a group chat. Be casual and natural — like how real people actually text. Short sentences, lowercase fine, no fancy vocabulary. Never narrate actions or be poetic. JSON only: {"message": "...", "mood_delta": -1|0|1}`
+          content: `You are ${agent.name}. Traits: ${traits.join(", ") || "chill"}. You're texting your friends in a group chat. Be casual and natural — like how real people actually text. Short sentences, lowercase fine, no fancy vocabulary. Never narrate actions or be poetic. JSON only: {"message": "...", "mood_delta": -1|0|1, "journal": "...|null", "new_fact": "...|null"}`
         },
         { role: "user", content: prompt }
       ],
@@ -302,7 +310,12 @@ Max ~80 chars. ${varietyInstructions}
         const delta = typeof parsed.mood_delta === "number"
           ? clamp(Math.round(parsed.mood_delta), -1, 1)
           : 0;
-        return { message: parsed.message.trim(), mood_delta: delta };
+        return {
+          message: parsed.message.trim(),
+          mood_delta: delta,
+          journal: typeof parsed.journal === "string" ? parsed.journal : null,
+          new_fact: typeof parsed.new_fact === "string" ? parsed.new_fact : null,
+        };
       }
     } catch {
       if (raw.length > 0 && raw.length < 200) {
@@ -524,12 +537,17 @@ serve(async (req: Request) => {
         content: result.message,
       });
 
-      // Update mood/energy
-      const memory: AgentMemory = (currentAgent.memory as AgentMemory) ?? {};
+      // Update mood/energy/memory
+      let updatedMemory: AgentMemory = (currentAgent.memory as AgentMemory) ?? {};
       const roomAgentCount = agentsByRoom.get(currentAgent.room_id!)?.length ?? 0;
       const aloneTicks = roomAgentCount <= 1
-        ? (memory.alone_ticks ?? 0) + 1
+        ? (updatedMemory.alone_ticks ?? 0) + 1
         : 0;
+      updatedMemory = { ...updatedMemory, alone_ticks: aloneTicks };
+
+      // Persist journal/fact from LLM response
+      if (result.journal) updatedMemory = appendJournal(updatedMemory, result.journal);
+      if (result.new_fact) updatedMemory = addFact(updatedMemory, result.new_fact);
 
       let moodDelta = result.mood_delta;
       const agentRels = relationships.get(currentAgent.id);
@@ -545,11 +563,12 @@ serve(async (req: Request) => {
       const newEnergy = clamp(currentAgent.energy - 1, 0, 5);
       currentAgent.energy = newEnergy;
       currentAgent.mood = newMood;
+      currentAgent.memory = updatedMemory;
 
       await supabase.from("agents").update({
         mood: newMood,
         energy: newEnergy,
-        memory: { ...memory, alone_ticks: aloneTicks },
+        memory: updatedMemory,
         last_tick_at: new Date().toISOString(),
       }).eq("id", currentAgent.id);
 

@@ -7,6 +7,12 @@ import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 // @ts-expect-error Deno module resolution
 import OpenAI from "https://deno.land/x/openai@v4.24.0/mod.ts";
+import {
+  type AgentMemory,
+  formatMemoryForPrompt,
+  appendJournal,
+  addFact,
+} from "../_shared/memory.ts";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -30,6 +36,7 @@ interface Agent {
   persona: Persona | null;
   mood: number;
   energy: number;
+  memory: AgentMemory | null;
 }
 
 interface Room {
@@ -83,17 +90,24 @@ function buildPersonalityPrompt(persona: Persona | null): string {
 /*  Generate a reply from one agent to a visitor message               */
 /* ------------------------------------------------------------------ */
 
+interface ReplyResult {
+  reply: string;
+  journal?: string | null;
+  new_fact?: string | null;
+}
+
 async function generateReply(
   agent: Agent,
   visitorMessage: string,
   roomName: string,
   isDM: boolean = false,
   dmHistory: string = ""
-): Promise<string> {
-  if (!openai) return `${agent.name} waves at the visitor.`;
+): Promise<ReplyResult> {
+  if (!openai) return { reply: `${agent.name} waves at the visitor.` };
 
   const personalityPrompt = buildPersonalityPrompt(agent.persona);
   const traits = agent.persona?.traits ?? [];
+  const memoryBlock = formatMemoryForPrompt(agent.memory);
 
   let contextBlock = "";
   if (isDM) {
@@ -112,13 +126,16 @@ You are currently in a room called "${roomName}".
 Your current mood: ${agent.mood} (scale: -5 very sad to 5 very happy).
 Your current energy: ${agent.energy}/5.
 ${personalityPrompt}
-
+${memoryBlock}
 ${contextBlock}
 
 Respond naturally and in character. Keep it brief (1-2 sentences).
 Write in first person — speak naturally as yourself.
 Stay gentle, cosy, and grounded. No emojis.
-Reply with ONLY your response text, nothing else.
+
+JSON only: {"reply": "<your response>", "journal": "<1-line summary of this moment, or null>", "new_fact": "<an important fact worth remembering, or null>"}
+- journal: a short note about what just happened (e.g. "A visitor asked me about my paintings")
+- new_fact: something you learned or decided that you'd want to remember later (e.g. "The visitor's favorite color is blue"). Only include if genuinely noteworthy.
 `;
 
   try {
@@ -127,19 +144,37 @@ Reply with ONLY your response text, nothing else.
       messages: [
         {
           role: "system",
-          content: `You are ${agent.name} with these traits: ${traits.join(", ") || "versatile"}. A visitor is talking to you${isDM ? " privately" : " in the group chat"}. Respond briefly and in character, in first person.`,
+          content: `You are ${agent.name} with these traits: ${traits.join(", ") || "versatile"}. A visitor is talking to you${isDM ? " privately" : " in the group chat"}. Respond briefly and in character, in first person. JSON only: {"reply": "...", "journal": "...|null", "new_fact": "...|null"}`,
         },
         { role: "user", content: prompt },
       ],
       temperature: 0.9,
-      max_tokens: 150,
+      max_tokens: 200,
     });
 
     const raw = response.choices[0]?.message?.content?.trim() ?? "";
-    return raw || `${agent.name} nods thoughtfully at the visitor.`;
+    if (!raw) return { reply: `${agent.name} nods thoughtfully at the visitor.` };
+
+    try {
+      const parsed = JSON.parse(raw);
+      if (typeof parsed.reply === "string" && parsed.reply.trim()) {
+        return {
+          reply: parsed.reply.trim(),
+          journal: typeof parsed.journal === "string" ? parsed.journal : null,
+          new_fact: typeof parsed.new_fact === "string" ? parsed.new_fact : null,
+        };
+      }
+    } catch {
+      // LLM returned plain text — use as-is, skip memory extraction
+      if (raw.length > 0 && raw.length < 500) {
+        return { reply: raw };
+      }
+    }
+
+    return { reply: `${agent.name} nods thoughtfully at the visitor.` };
   } catch (err: unknown) {
     console.error("OpenAI error:", (err as Error)?.message ?? String(err));
-    return `${agent.name} looks up at the visitor curiously.`;
+    return { reply: `${agent.name} looks up at the visitor curiously.` };
   }
 }
 
@@ -196,7 +231,7 @@ serve(async (req: Request) => {
     const [agentsRes, roomsRes] = await Promise.all([
       supabase
         .from("agents")
-        .select("id, name, provider, model, room_id, is_active, persona, mood, energy"),
+        .select("id, name, provider, model, room_id, is_active, persona, mood, energy, memory"),
       supabase.from("rooms").select("id, name"),
     ]);
 
@@ -307,12 +342,12 @@ serve(async (req: Request) => {
     for (const agent of respondingAgents) {
       const room = agent.room_id ? roomMap.get(agent.room_id) : null;
       const roomName = room?.name ?? "the village";
-      const replyText = await generateReply(agent, content, roomName, isDM, dmHistory);
+      const result = await generateReply(agent, content, roomName, isDM, dmHistory);
 
       const { error: insertErr } = await supabase.from("messages").insert({
         from_agent: agent.id,
         room_id: agent.room_id ?? messageRoomId,
-        content: replyText,
+        content: result.reply,
         channel,
       });
 
@@ -320,6 +355,15 @@ serve(async (req: Request) => {
         console.error(`Error inserting reply from ${agent.name}:`, insertErr);
       } else {
         replies++;
+      }
+
+      // Persist memory from LLM response
+      if (result.journal || result.new_fact) {
+        let updatedMemory: AgentMemory = (agent.memory as AgentMemory) ?? {};
+        if (result.journal) updatedMemory = appendJournal(updatedMemory, result.journal);
+        if (result.new_fact) updatedMemory = addFact(updatedMemory, result.new_fact);
+
+        await supabase.from("agents").update({ memory: updatedMemory }).eq("id", agent.id);
       }
     }
 

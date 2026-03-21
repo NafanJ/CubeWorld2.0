@@ -22,6 +22,8 @@ interface Persona {
 
 interface AgentMemory {
   alone_ticks?: number;
+  journal?: Array<{ t: string; text: string }>;
+  facts?: string[];
 }
 
 interface Agent {
