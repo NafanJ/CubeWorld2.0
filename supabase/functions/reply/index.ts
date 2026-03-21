@@ -116,7 +116,7 @@ ${personalityPrompt}
 ${contextBlock}
 
 Respond naturally and in character. Keep it brief (1-2 sentences).
-Write in third person (e.g. "${agent.name} smiles and says '...'").
+Write in first person — speak naturally as yourself.
 Stay gentle, cosy, and grounded. No emojis.
 Reply with ONLY your response text, nothing else.
 `;
@@ -127,7 +127,7 @@ Reply with ONLY your response text, nothing else.
       messages: [
         {
           role: "system",
-          content: `You are ${agent.name} with these traits: ${traits.join(", ") || "versatile"}. A visitor is talking to you${isDM ? " privately" : " in the group chat"}. Respond briefly and in character, in third person.`,
+          content: `You are ${agent.name} with these traits: ${traits.join(", ") || "versatile"}. A visitor is talking to you${isDM ? " privately" : " in the group chat"}. Respond briefly and in character, in first person.`,
         },
         { role: "user", content: prompt },
       ],

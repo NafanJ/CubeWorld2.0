@@ -464,12 +464,12 @@ Now decide what to do or say next. You can:
 
 Reply with a JSON object: {"message": "<your one-line action or speech>", "mood_delta": <-1, 0, or 1>}
 The message should be ONE short, present-tense line (max ~100 characters).
-You can include speech like: ${agent.name} says "..." or describe an action.
+Write as yourself in first person — speak naturally, describe what you're doing, or chat with others.
 mood_delta should reflect how this makes you feel (-1 worse, 0 same, 1 better).
 
 Keep it gentle, slice-of-life, and grounded.
 ${varietyInstructions}
-No emojis. Always write in third person perspective.
+No emojis.
 Reply with ONLY the JSON object. Nothing else.
 `;
 
