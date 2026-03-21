@@ -591,6 +591,11 @@ serve(async (req: Request) => {
     // Phase 1: Move agents along their paths
     // ----------------------------------------------------------
     const roomIds = Array.from(roomsMap.keys());
+    // Non-elevator rooms are valid destinations (elevators are at x=1)
+    const nonElevatorRoomIds = roomIds.filter((id) => {
+      const r = roomsMap.get(id);
+      return r && r.x !== 1;
+    });
     for (const agent of agents) {
       try {
         if (!agent.room_id) continue;
@@ -615,7 +620,8 @@ serve(async (req: Request) => {
             for (const [otherId, affinity] of agentRels) {
               if (affinity >= 5 && affinity > bestAffinity) {
                 const otherAgent = agents.find((a) => a.id === otherId);
-                if (otherAgent?.room_id && otherAgent.room_id !== agent.room_id) {
+                const targetRoom = otherAgent?.room_id ? roomsMap.get(otherAgent.room_id) : null;
+                if (otherAgent?.room_id && otherAgent.room_id !== agent.room_id && targetRoom && targetRoom.x !== 1) {
                   bestAffinity = affinity;
                   bestTargetRoom = otherAgent.room_id;
                 }
@@ -643,14 +649,14 @@ serve(async (req: Request) => {
               }
             }
 
-            const candidates = roomIds.filter(
+            const candidates = nonElevatorRoomIds.filter(
               (r) => r !== agent.room_id && !avoidRooms.has(r)
             );
             if (candidates.length > 0) {
               destinationId = candidates[Math.floor(Math.random() * candidates.length)];
             } else {
-              // Fallback: pick any room if all are avoided
-              const fallback = roomIds.filter((r) => r !== agent.room_id);
+              // Fallback: pick any non-elevator room if all are avoided
+              const fallback = nonElevatorRoomIds.filter((r) => r !== agent.room_id);
               if (fallback.length > 0) {
                 destinationId = fallback[Math.floor(Math.random() * fallback.length)];
               }
