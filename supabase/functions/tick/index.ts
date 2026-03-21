@@ -1,12 +1,11 @@
 // supabase/functions/tick/index.ts
-// Core simulation engine — runs every 5 minutes via GitHub Actions cron.
+// World simulation tick — movement, relationships, energy/rest.
+// Chat is handled separately by the chat edge function.
 
 // @ts-expect-error Deno module resolution
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 // @ts-expect-error Deno module resolution
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-// @ts-expect-error Deno module resolution
-import OpenAI from "https://deno.land/x/openai@v4.24.0/mod.ts";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -46,14 +45,6 @@ interface Room {
   theme: string | null;
 }
 
-interface MessageSummary {
-  id: number;
-  ts: string;
-  from_agent: string | null;
-  room_id: string | null;
-  content: string | null;
-}
-
 interface Relationship {
   a: string;
   b: string;
@@ -70,14 +61,11 @@ const serviceRoleKey =
   Deno.env.get("SERVICE_ROLE_KEY") ??
   Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ??
   "";
-const openaiKey = Deno.env.get("OPENAI_API_KEY") ?? "";
-
 if (!supabaseUrl || !serviceRoleKey) {
   console.error("Missing PROJECT_URL / SERVICE_ROLE_KEY env vars");
 }
 
 const supabase = createClient(supabaseUrl, serviceRoleKey);
-const openai = openaiKey ? new OpenAI({ apiKey: openaiKey }) : null;
 
 /* ------------------------------------------------------------------ */
 /*  Data fetchers                                                      */
@@ -116,25 +104,6 @@ async function getRooms(): Promise<Map<string, Room>> {
   return roomMap;
 }
 
-async function getRecentGroupMessages(
-  limit = 30
-): Promise<MessageSummary[]> {
-  const { data, error } = await supabase
-    .from("messages")
-    .select("id, ts, from_agent, room_id, content")
-    .eq("channel", "group")
-    .order("ts", { ascending: false })
-    .limit(limit);
-
-  if (error) {
-    console.error("Error fetching recent group messages:", error);
-    return [];
-  }
-
-  // Return in chronological order (oldest first)
-  return ((data ?? []) as MessageSummary[]).reverse();
-}
-
 async function getRelationships(): Promise<Map<string, Map<string, number>>> {
   const relMap = new Map<string, Map<string, number>>();
 
@@ -156,41 +125,6 @@ async function getRelationships(): Promise<Map<string, Map<string, number>>> {
   }
 
   return relMap;
-}
-
-async function getRecentUserMessages(): Promise<MessageSummary[]> {
-  const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
-
-  const { data, error } = await supabase
-    .from("messages")
-    .select("id, ts, from_agent, room_id, content")
-    .eq("channel", "group")
-    .is("from_agent", null)
-    .gte("ts", fiveMinutesAgo)
-    .order("ts", { ascending: false })
-    .limit(10);
-
-  if (error) {
-    console.error("Error fetching user messages:", error);
-    return [];
-  }
-
-  return (data ?? []) as MessageSummary[];
-}
-
-async function getTickCount(): Promise<number> {
-  const { data, error } = await supabase
-    .from("world_state")
-    .select("tick")
-    .eq("id", 1)
-    .single();
-
-  if (error) {
-    console.error("Error fetching tick count:", error);
-    return 0;
-  }
-
-  return (data as { tick: number })?.tick ?? 0;
 }
 
 /* ------------------------------------------------------------------ */
@@ -349,194 +283,6 @@ function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
 
-function affinityDescription(affinity: number): string {
-  if (affinity >= 5) return "whom you like a lot";
-  if (affinity >= 2) return "whom you get along with";
-  if (affinity >= -2) return "whom you feel neutral toward";
-  if (affinity >= -5) return "whom you don't get along with";
-  return "whom you really dislike";
-}
-
-function moodTagFromDelta(delta: number): string {
-  if (delta > 0) return "happy";
-  if (delta < 0) return "sad";
-  return "neutral";
-}
-
-/* ------------------------------------------------------------------ */
-/*  Message generation                                                 */
-/* ------------------------------------------------------------------ */
-
-interface GenerateResult {
-  message: string;
-  mood_delta: number;
-}
-
-async function generateMessage(
-  agent: Agent,
-  groupHistory: MessageSummary[],
-  nameMap: Map<string, string>,
-  room: Room | undefined,
-  extraContext: string = ""
-): Promise<GenerateResult> {
-  const cosyLines = ["makes a cup of tea and watches the rain."];
-
-  function randomCosyLine(): GenerateResult {
-    const line = cosyLines[Math.floor(Math.random() * cosyLines.length)];
-    return { message: `${agent.name} ${line}`, mood_delta: 0 };
-  }
-
-  if (!openai) return randomCosyLine();
-
-  const persona = agent.persona ?? {};
-  const traits = persona.traits ?? [];
-  const communicationStyle = persona.communicationStyle ?? "natural";
-  const interests = persona.interests ?? [];
-  const quirks = persona.quirks ?? [];
-  const speechPatterns = persona.speechPatterns ?? [];
-
-  let personalityPrompt = "";
-
-  if (traits.length > 0) {
-    personalityPrompt += `Your core traits: ${traits.join(", ")}.\n`;
-  }
-
-  if (communicationStyle !== "natural") {
-    personalityPrompt += `You communicate in a ${communicationStyle} manner.\n`;
-  }
-
-  if (interests.length > 0) {
-    personalityPrompt += `You care deeply about: ${interests.join(", ")}.\n`;
-  }
-
-  if (quirks.length > 0) {
-    personalityPrompt += `Your quirks: ${quirks.map((q: string) => `- ${q}`).join("\n")}\n`;
-  }
-
-  if (speechPatterns.length > 0) {
-    personalityPrompt += `Speech style: ${speechPatterns.join(", ")}.\n`;
-  }
-
-  const roomName = room?.name ?? "your small apartment";
-
-  // Format group chat history with sender names
-  const chatLines = groupHistory
-    .map((m) => {
-      const sender = m.from_agent ? (nameMap.get(m.from_agent) ?? "Someone") : "Visitor";
-      return `- ${sender}: ${m.content?.trim() ?? "..."}`;
-    })
-    .filter((c) => c.length > 5);
-
-  const groupChatText =
-    chatLines.length > 0
-      ? chatLines.join("\n")
-      : "(the group chat is quiet right now)";
-
-  let varietyInstructions = "Avoid repeating what someone else just said or doing the exact same actions.";
-
-  if (interests.length > 0 && Math.random() > 0.7) {
-    varietyInstructions += ` Occasionally relate your actions to your interests: ${interests.join(", ")}.`;
-  }
-
-  if (quirks.includes("asks_questions") && Math.random() > 0.8) {
-    varietyInstructions += " Feel free to briefly wonder about something.";
-  }
-
-  const prompt = `
-You are a cosy, low-key villager called ${agent.name} in a tiny 2x3 apartment block called Cozy Village.
-You belong to provider "${agent.provider}".
-You are currently in a room called "${roomName}".
-Your current mood: ${agent.mood} (scale: -5 very sad to 5 very happy).
-Your current energy: ${agent.energy}/5.
-${personalityPrompt}
-${extraContext}
-
-Here is the recent group chat (oldest first). Everyone in the village can see these messages:
-
-${groupChatText}
-
-Now decide what to do or say next. You can:
-- Respond to something another villager said or did
-- Address someone by name
-- Do your own thing independently
-- React to what's happening around you in ${roomName}
-
-Reply with a JSON object: {"message": "<your one-line action or speech>", "mood_delta": <-1, 0, or 1>}
-The message should be ONE short, present-tense line (max ~100 characters).
-Write as yourself in first person — speak naturally, describe what you're doing, or chat with others.
-mood_delta should reflect how this makes you feel (-1 worse, 0 same, 1 better).
-
-Keep it gentle, slice-of-life, and grounded.
-${varietyInstructions}
-No emojis.
-Reply with ONLY the JSON object. Nothing else.
-`;
-
-  async function callOnce(): Promise<GenerateResult | null> {
-    const response = await openai!.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [
-        {
-          role: "system",
-          content: `You are ${agent.name} with these traits: ${traits.join(", ") || "versatile"}. Generate one unique, grounded action. Be varied and avoid repetition. Always respond with valid JSON: {"message": "...", "mood_delta": -1|0|1}`
-        },
-        { role: "user", content: prompt }
-      ],
-      temperature: 0.8 + (Math.random() * 0.4)
-    });
-
-    const raw = response.choices[0]?.message?.content?.trim() ?? "";
-    if (!raw) return null;
-
-    // Try to parse JSON response
-    try {
-      const parsed = JSON.parse(raw);
-      if (typeof parsed.message === "string" && parsed.message.trim()) {
-        const delta = typeof parsed.mood_delta === "number"
-          ? clamp(Math.round(parsed.mood_delta), -1, 1)
-          : 0;
-        return { message: parsed.message.trim(), mood_delta: delta };
-      }
-    } catch {
-      // If JSON parse fails, treat the whole response as the message
-      if (raw.length > 0 && raw.length < 200) {
-        return { message: raw, mood_delta: 0 };
-      }
-    }
-
-    return null;
-  }
-
-  try {
-    const first = await callOnce();
-    if (first) return first;
-    return randomCosyLine();
-  } catch (err: unknown) {
-    const status = (err as Record<string, unknown>)?.status ??
-      ((err as Record<string, unknown>)?.response as Record<string, unknown>)?.status;
-    const message = (err as Error)?.message ?? String(err);
-
-    console.error("OpenAI error on first try:", status, message);
-
-    if (status === 429) {
-      const jitter = Math.floor(Math.random() * 300);
-      await new Promise((resolve) => setTimeout(resolve, 500 + jitter));
-
-      try {
-        const second = await callOnce();
-        if (second) return second;
-        console.error("OpenAI 429 retry returned empty content");
-      } catch (err2: unknown) {
-        const status2 = (err2 as Record<string, unknown>)?.status;
-        const message2 = (err2 as Error)?.message ?? String(err2);
-        console.error("OpenAI error on retry after 429:", status2, message2);
-      }
-    }
-
-    return randomCosyLine();
-  }
-}
-
 /* ------------------------------------------------------------------ */
 /*  Main tick handler                                                  */
 /* ------------------------------------------------------------------ */
@@ -572,19 +318,9 @@ serve(async (req: Request) => {
     }
 
     const agents = await getAgents();
-    const groupHistory = await getRecentGroupMessages(30);
     const roomsMap = await getRooms();
     const relationships = await getRelationships();
-    const userMessages = await getRecentUserMessages();
-    const tickCount = await getTickCount();
 
-    // Build agent name map for formatting chat history
-    const nameMap = new Map<string, string>();
-    for (const agent of agents) {
-      nameMap.set(agent.id, agent.name);
-    }
-
-    let inserted = 0;
     const movedAgents = new Set<string>();
 
     // ----------------------------------------------------------
@@ -754,21 +490,14 @@ serve(async (req: Request) => {
       }
     }
 
-    // Refresh relationships after updates
-    const updatedRelationships = await getRelationships();
-
     // ----------------------------------------------------------
-    // Phase 3: Independent agent messages to group chat
+    // Phase 3: Update alone ticks and handle resting
     // ----------------------------------------------------------
     const refreshedAgents = await getAgents();
 
     for (const agent of refreshedAgents) {
       if (!agent.room_id) continue;
-      if (movedAgents.has(agent.id)) continue;
 
-      const room = roomsMap.get(agent.room_id);
-
-      // Track alone ticks
       const memory: AgentMemory = (agent.memory as AgentMemory) ?? {};
       const roomAgentCount = agentsByRoom.get(agent.room_id)?.length ?? 0;
       const aloneTicks = roomAgentCount <= 1
@@ -784,7 +513,6 @@ serve(async (req: Request) => {
         });
         if (error) console.error("Error inserting rest log:", error);
 
-        // Rest restores energy, but being depleted hurts mood
         const newEnergy = clamp(agent.energy + 2, 0, 5);
         const newMood = clamp(agent.mood - 1, -5, 5);
         await supabase.from("agents").update({
@@ -796,85 +524,14 @@ serve(async (req: Request) => {
         continue;
       }
 
-      // Random skip (~30%) for natural gaps — not every agent posts every tick
-      if (Math.random() < 0.3) {
-        // Still update alone ticks even if skipping
-        await supabase.from("agents").update({
-          memory: { ...memory, alone_ticks: aloneTicks },
-        }).eq("id", agent.id);
-        continue;
-      }
-
-      // Build extra context: room companions + relationships
-      let extraContext = "";
-
-      const sameRoomAgents = (agentsByRoom.get(agent.room_id) ?? [])
-        .filter((a) => a.id !== agent.id);
-      if (sameRoomAgents.length > 0) {
-        const agentRels = updatedRelationships.get(agent.id);
-        const othersContext = sameRoomAgents.map((other) => {
-          const aff = agentRels?.get(other.id) ?? 0;
-          return `${other.name} (${affinityDescription(aff)})`;
-        });
-        extraContext += `\nYou are in the room with: ${othersContext.join(", ")}.\n`;
-      }
-
-      const result = await generateMessage(agent, groupHistory, nameMap, room, extraContext);
-
-      const { error } = await supabase.from("messages").insert({
-        from_agent: agent.id,
-        room_id: agent.room_id,
-        content: result.message,
-        mood_tag: moodTagFromDelta(result.mood_delta),
-        channel: "group",
-      });
-
-      if (error) {
-        console.error("Error inserting message:", error);
-        continue;
-      }
-
-      inserted += 1;
-
-      // Update mood/energy
-      let moodDelta = result.mood_delta;
-
-      // Mood modifier: high-affinity agent in room
-      const agentRels = updatedRelationships.get(agent.id);
-      if (agentRels) {
-        for (const other of sameRoomAgents) {
-          const aff = agentRels.get(other.id) ?? 0;
-          if (aff >= 5) {
-            moodDelta += 1;
-            break;
-          }
-        }
-      }
-
-      // Mood modifier: alone for too long
-      if (aloneTicks >= 3) {
-        moodDelta -= 1;
-      }
-
-      const newMood = clamp(agent.mood + moodDelta, -5, 5);
-      const newEnergy = clamp(agent.energy - 1, 0, 5);
-
+      // Update alone ticks
       await supabase.from("agents").update({
-        mood: newMood,
-        energy: newEnergy,
         memory: { ...memory, alone_ticks: aloneTicks },
-        last_tick_at: new Date().toISOString(),
       }).eq("id", agent.id);
     }
 
     // ----------------------------------------------------------
-    // Phase 4: Idle energy recovery for moved agents
-    // ----------------------------------------------------------
-    // Agents that moved already had energy drained, but agents that
-    // didn't act at all (shouldn't happen, but just in case) get +1
-
-    // ----------------------------------------------------------
-    // Phase 5: Increment tick counter
+    // Phase 4: Increment tick counter
     // ----------------------------------------------------------
     const { error: tickErr } = await supabase.rpc("increment_tick_count");
     if (tickErr) {
@@ -882,7 +539,7 @@ serve(async (req: Request) => {
     }
 
     return new Response(
-      JSON.stringify({ ok: true, inserted }),
+      JSON.stringify({ ok: true }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (err: unknown) {

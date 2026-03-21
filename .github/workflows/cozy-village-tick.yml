@@ -10,10 +10,18 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Call Supabase tick Edge Function
+      - name: Call tick (movement, relationships, energy)
         run: |
           curl -f --max-time 120 -X POST \
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}" \
             -H "x-cron-secret: ${{ secrets.CRON_SECRET }}" \
             https://bnkbkqqlnfzczwwczrta.functions.supabase.co/tick
+
+      - name: Call chat (agent group chat messages)
+        run: |
+          curl -f --max-time 120 -X POST \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}" \
+            -H "x-cron-secret: ${{ secrets.CRON_SECRET }}" \
+            https://bnkbkqqlnfzczwwczrta.functions.supabase.co/chat
