@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
+import { Activity, MessageSquare, Users, Zap } from 'lucide-react';
 
 type WorldState = {
   id: number;
@@ -21,19 +22,13 @@ export function SystemTab() {
       const [worldStateRes, messageCountRes, agentsRes] = await Promise.all([
         supabase.from('world_state').select('*').eq('id', 1).single(),
         supabase.from('messages').select('id', { count: 'exact', head: true }),
-        supabase.from('agents').select('id, is_active')
+        supabase.from('agents').select('id, is_active'),
       ]);
-      
+
       if (!mounted) return;
-      
-      if (worldStateRes.data) {
-        setWorldState(worldStateRes.data as WorldState);
-      }
-      
-      if (messageCountRes.count !== null) {
-        setTotalMessages(messageCountRes.count);
-      }
-      
+
+      if (worldStateRes.data) setWorldState(worldStateRes.data as WorldState);
+      if (messageCountRes.count !== null) setTotalMessages(messageCountRes.count);
       if (agentsRes.data) {
         setTotalAgents(agentsRes.data.length);
         setActiveAgents(agentsRes.data.filter((a: any) => a.is_active).length);
@@ -44,13 +39,9 @@ export function SystemTab() {
 
     const channel = supabase
       .channel('public:world_state')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'world_state' },
-        () => {
-          loadSystemData();
-        }
-      )
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'world_state' }, () => {
+        loadSystemData();
+      })
       .subscribe();
 
     return () => {
@@ -76,62 +67,86 @@ export function SystemTab() {
     }
   };
 
+  const stats = [
+    {
+      label: 'Current Tick',
+      value: worldState?.tick?.toLocaleString() || '0',
+      icon: Activity,
+      color: '#059669',
+      bg: '#ecfdf5',
+    },
+    {
+      label: 'Total Messages',
+      value: totalMessages.toLocaleString(),
+      icon: MessageSquare,
+      color: '#0ea5e9',
+      bg: '#f0f9ff',
+    },
+    {
+      label: 'Active Agents',
+      value: `${activeAgents} / ${totalAgents}`,
+      icon: Users,
+      color: '#8b5cf6',
+      bg: '#f5f3ff',
+    },
+    {
+      label: 'Simulation',
+      value: 'Running',
+      icon: Zap,
+      color: '#f59e0b',
+      bg: '#fffbeb',
+    },
+  ];
+
   return (
-    <div className="flex-1 overflow-y-auto p-4 space-y-4">
-      {/* Statistics */}
-      <div className="bg-white border-4 border-indigo-300 rounded-lg p-4 pixel-border-sm animate-slide-in">
-        <h3 className="pixel-text text-sm font-bold text-indigo-900 mb-3">STATISTICS</h3>
-        <div className="space-y-2">
-          <div className="flex justify-between items-center">
-            <span className="text-xs text-gray-700 font-semibold">Current Tick:</span>
-            <span className="text-xs text-gray-900 font-bold">
-              {worldState?.tick?.toLocaleString() || 0}
-            </span>
+    <div className="flex-1 overflow-y-auto p-4 lg:p-6 bg-stone-50">
+      {/* Stats grid */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+        {stats.map(({ label, value, icon: Icon, color, bg }) => (
+          <div
+            key={label}
+            className="bg-white rounded-xl border border-stone-200 p-4 flex items-start gap-3 animate-slide-in"
+          >
+            <div
+              className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
+              style={{ backgroundColor: bg }}
+            >
+              <Icon className="w-4 h-4" style={{ color }} />
+            </div>
+            <div>
+              <p className="text-xs text-stone-500 mb-0.5">{label}</p>
+              <p className="text-lg font-semibold text-stone-900 leading-tight">{value}</p>
+            </div>
           </div>
-          <div className="flex justify-between items-center">
-            <span className="text-xs text-gray-700 font-semibold">Total Messages:</span>
-            <span className="text-xs text-gray-900 font-bold">
-              {totalMessages.toLocaleString()}
-            </span>
-          </div>
-          <div className="flex justify-between items-center">
-            <span className="text-xs text-gray-700 font-semibold">Total Agents:</span>
-            <span className="text-xs text-gray-900 font-bold">{totalAgents}</span>
-          </div>
-          <div className="flex justify-between items-center">
-            <span className="text-xs text-gray-700 font-semibold">Active Agents:</span>
-            <span className="text-xs text-gray-900 font-bold">{activeAgents}</span>
-          </div>
+        ))}
+      </div>
+
+      {/* Controls */}
+      <div className="bg-white rounded-xl border border-stone-200 p-5 mb-5 animate-slide-in">
+        <h3 className="text-sm font-semibold text-stone-700 mb-3">Simulation Controls</h3>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handleRunTick}
+            disabled={tickLoading}
+            className="px-5 py-2.5 rounded-lg text-sm font-semibold text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            style={{ backgroundColor: tickLoading ? '#6ee7b7' : '#059669' }}
+          >
+            {tickLoading ? 'Running…' : 'Run Tick'}
+          </button>
+          {tickResult === 'success' && (
+            <span className="text-sm font-medium text-emerald-600">Tick completed!</span>
+          )}
+          {tickResult === 'error' && (
+            <span className="text-sm font-medium text-red-500">Tick failed</span>
+          )}
         </div>
       </div>
 
-      {/* Run Tick */}
-      <div className="bg-white border-4 border-indigo-300 rounded-lg p-4 pixel-border-sm animate-slide-in">
-        <h3 className="pixel-text text-sm font-bold text-indigo-900 mb-3">CONTROLS</h3>
-        <button
-          onClick={handleRunTick}
-          disabled={tickLoading}
-          className={`pixel-text text-xs px-4 py-2 rounded-md font-bold border-2 transition-colors ${
-            tickLoading
-              ? 'bg-indigo-300 text-indigo-500 border-indigo-400 cursor-not-allowed'
-              : 'bg-indigo-600 text-white border-indigo-800 hover:bg-indigo-700'
-          }`}
-        >
-          {tickLoading ? 'RUNNING...' : 'RUN TICK'}
-        </button>
-        {tickResult === 'success' && (
-          <span className="ml-3 text-xs font-semibold text-green-600">Tick completed!</span>
-        )}
-        {tickResult === 'error' && (
-          <span className="ml-3 text-xs font-semibold text-red-600">Tick failed</span>
-        )}
-      </div>
-
       {/* World Rules */}
-      <div className="bg-white border-4 border-indigo-300 rounded-lg p-4 pixel-border-sm animate-slide-in">
-        <h3 className="pixel-text text-sm font-bold text-indigo-900 mb-3">WORLD RULES</h3>
-        <div className="bg-gray-50 border border-gray-300 rounded p-2 max-h-64 overflow-auto">
-          <pre className="text-xs text-gray-700 whitespace-pre-wrap break-words">
+      <div className="bg-white rounded-xl border border-stone-200 p-5 animate-slide-in">
+        <h3 className="text-sm font-semibold text-stone-700 mb-3">World Rules</h3>
+        <div className="bg-stone-50 rounded-lg p-3 max-h-64 overflow-auto border border-stone-100">
+          <pre className="text-xs text-stone-600 font-mono whitespace-pre-wrap break-words leading-relaxed">
             {worldState?.rules && Object.keys(worldState.rules).length > 0
               ? JSON.stringify(worldState.rules, null, 2)
               : '{}'}

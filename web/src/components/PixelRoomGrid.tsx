@@ -6,17 +6,21 @@ import { supabase } from '../lib/supabase';
 interface RoomUI {
   id: string;
   roomName: string;
-  status: string;
   backgroundImage?: string;
-  characters: string[]; // avatars (initials)
+  characters: string[];
   usernames: string[];
+  agentIds: string[];
   isElevator: boolean;
 }
 
-export const PixelRoomGrid: React.FC = () => {
+interface PixelRoomGridProps {
+  agentColorMap?: Record<string, string>;
+}
+
+export const PixelRoomGrid: React.FC<PixelRoomGridProps> = ({ agentColorMap = {} }) => {
   const [rooms, setRooms] = useState<RoomUI[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  // List of available room images
+
   const roomImages = [
     '/rooms/Room1.jpg',
     '/rooms/Elevator.png',
@@ -34,7 +38,6 @@ export const PixelRoomGrid: React.FC = () => {
 
     const load = async () => {
       try {
-        // Fetch data from Supabase
         const { data: roomsData, error: rErr } = await supabase
           .from('rooms')
           .select('id, name, theme, x, y')
@@ -60,27 +63,25 @@ export const PixelRoomGrid: React.FC = () => {
           const inRoom = agents.filter((ag) => ag.room_id === r.id);
           const chars = inRoom.map((ag) => (ag.name ? ag.name.charAt(0) : ''));
           const usernames = inRoom.map((ag) => ag.name || 'Anon');
-          // Cycle through available room images by index
+          const agentIds = inRoom.map((ag) => ag.id);
           const bg = roomImages[idx % roomImages.length];
-          // Elevators are at x=1
           const isElevator = r.x === 1;
           return {
             id: r.id,
             roomName: r.name || `Room ${idx + 1}`,
-            status: 'online',
             backgroundImage: bg,
             characters: chars,
             usernames,
-            isElevator
+            agentIds,
+            isElevator,
           };
         });
 
-        // Preload all room images before showing the UI
         const imagePromises = roomImages.map((src) => {
           return new Promise<void>((resolve) => {
             const img = new Image();
             img.onload = () => resolve();
-            img.onerror = () => resolve(); // Continue even if an image fails
+            img.onerror = () => resolve();
             img.src = src;
           });
         });
@@ -97,23 +98,15 @@ export const PixelRoomGrid: React.FC = () => {
     };
 
     load();
-    // subscribe to agents/rooms changes so UI updates when agents move
+
     const channel = supabase
       .channel('public:agents-rooms')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'agents' },
-        () => {
-          if (mounted) void load();
-        }
-      )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'rooms' },
-        () => {
-          if (mounted) void load();
-        }
-      )
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'agents' }, () => {
+        if (mounted) void load();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'rooms' }, () => {
+        if (mounted) void load();
+      })
       .subscribe();
 
     return () => {
@@ -122,16 +115,15 @@ export const PixelRoomGrid: React.FC = () => {
     };
   }, []);
 
-  const nonElevatorRooms = rooms.filter(r => !r.isElevator);
+  const nonElevatorRooms = rooms.filter((r) => !r.isElevator);
 
-  // Skeleton UI while loading
   if (isLoading) {
     return (
       <>
-        {/* Mobile skeleton - fills viewport */}
-        <div className="lg:hidden w-full h-full grid grid-cols-2 grid-rows-3 gap-2 p-1">
+        {/* Mobile skeleton */}
+        <div className="lg:hidden w-full h-full grid grid-cols-2 grid-rows-3 gap-2 p-2">
           {[1, 2, 3, 4, 5, 6].map((i) => (
-            <div key={i} className="bg-gray-300 rounded-xl animate-pulse" />
+            <div key={i} className="bg-stone-200 rounded-xl animate-pulse" />
           ))}
         </div>
         {/* Desktop skeleton */}
@@ -140,7 +132,7 @@ export const PixelRoomGrid: React.FC = () => {
             const isElevatorPos = i === 2 || i === 5 || i === 8;
             return (
               <div key={i} className={isElevatorPos ? 'col-span-1' : 'aspect-video col-span-3'}>
-                <div className="w-full h-full bg-gray-300 rounded-lg animate-pulse" />
+                <div className="w-full h-full bg-stone-200 rounded-xl animate-pulse" />
               </div>
             );
           })}
@@ -151,23 +143,23 @@ export const PixelRoomGrid: React.FC = () => {
 
   return (
     <>
-      {/* Mobile: 2x3 grid that fills the available space */}
-      <div className="lg:hidden w-full h-full grid grid-cols-2 grid-rows-3 gap-2 p-1">
+      {/* Mobile: 2×3 grid */}
+      <div className="lg:hidden w-full h-full grid grid-cols-2 grid-rows-3 gap-2 p-2">
         {nonElevatorRooms.map((room) => (
           <div key={room.id} className="relative rounded-xl overflow-hidden">
             <RoomCard
-              color="teal"
               characters={room.characters}
               usernames={room.usernames}
+              agentIds={room.agentIds}
+              agentColorMap={agentColorMap}
               roomName={room.roomName}
-              status={room.status}
               backgroundImage={room.backgroundImage}
             />
           </div>
         ))}
       </div>
 
-      {/* Desktop: original 7-column grid with elevators */}
+      {/* Desktop: 7-column grid with elevator columns */}
       <div className="hidden lg:grid grid-cols-7 gap-3 max-w-5xl w-full auto-rows-fr">
         {rooms.map((room) => (
           <div key={room.id} className={room.isElevator ? 'col-span-1' : 'aspect-video col-span-3'}>
@@ -175,16 +167,18 @@ export const PixelRoomGrid: React.FC = () => {
               <ElevatorCard
                 characters={room.characters}
                 usernames={room.usernames}
+                agentIds={room.agentIds}
+                agentColorMap={agentColorMap}
                 roomName={room.roomName}
                 backgroundImage={room.backgroundImage}
               />
             ) : (
               <RoomCard
-                color="teal"
                 characters={room.characters}
                 usernames={room.usernames}
+                agentIds={room.agentIds}
+                agentColorMap={agentColorMap}
                 roomName={room.roomName}
-                status={room.status}
                 backgroundImage={room.backgroundImage}
               />
             )}
