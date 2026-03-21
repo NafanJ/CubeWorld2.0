@@ -110,8 +110,12 @@ export const PixelRoomGrid: React.FC<PixelRoomGridProps> = ({ agentColorMap = {}
       })
       .subscribe();
 
+    // Poll as fallback for UPDATE events that Realtime may miss
+    const poll = setInterval(() => { if (mounted) void load(); }, 30000);
+
     return () => {
       mounted = false;
+      clearInterval(poll);
       void supabase.removeChannel(channel);
     };
   }, []);

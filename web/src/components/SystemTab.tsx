@@ -41,12 +41,16 @@ export function SystemTab() {
     const channel = supabase
       .channel('public:world_state')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'world_state' }, () => {
-        loadSystemData();
+        if (mounted) loadSystemData();
       })
       .subscribe();
 
+    // Poll as fallback for UPDATE events that Realtime may miss
+    const poll = setInterval(() => { if (mounted) loadSystemData(); }, 30000);
+
     return () => {
       mounted = false;
+      clearInterval(poll);
       void supabase.removeChannel(channel);
     };
   }, []);
