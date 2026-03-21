@@ -5,11 +5,11 @@ import { ChatLogTab } from './ChatLogTab';
 import { ConversationList } from './ConversationList';
 import { StatusTab } from './StatusTab';
 import { SystemTab } from './SystemTab';
-import { DiaryTab } from './DiaryTab';
+import { AgentLogsTab } from './DiaryTab';
 import { PixelRoomGrid } from './PixelRoomGrid';
 import type { ActiveTab } from '../App';
 
-type LogsSubTab = 'chat' | 'diary';
+type LogsSubTab = 'chat' | 'logs';
 
 interface ChatPanelProps {
   activeSection: ActiveTab;
@@ -116,12 +116,12 @@ export function ChatPanel({ activeSection, onRoomSelect }: ChatPanelProps) {
         <StatusTab agentColorMap={agentColorMap} />
       </div>
 
-      {/* Logs — chat + diary */}
+      {/* Chats — chat + agent logs */}
       <div
         style={{ display: activeSection === 'logs' ? 'flex' : 'none' }}
         className={`flex-1 min-h-0 flex flex-col overflow-hidden${animatingSection === 'logs' ? ' tab-content-enter' : ''}`}
       >
-        {/* Logs sub-tab nav */}
+        {/* Chats sub-tab nav */}
         <div className="flex border-b border-stone-200 bg-white px-4 flex-shrink-0">
           <button
             onClick={() => setLogsSubTab('chat')}
@@ -134,14 +134,14 @@ export function ChatPanel({ activeSection, onRoomSelect }: ChatPanelProps) {
             Chat
           </button>
           <button
-            onClick={() => setLogsSubTab('diary')}
+            onClick={() => setLogsSubTab('logs')}
             className={`px-4 py-3 text-sm font-medium border-b-2 -mb-px transition-colors ${
-              logsSubTab === 'diary'
+              logsSubTab === 'logs'
                 ? 'border-emerald-600 text-emerald-700'
                 : 'border-transparent text-stone-500 hover:text-stone-700'
             }`}
           >
-            Diary
+            Activity
           </button>
         </div>
 
@@ -167,12 +167,12 @@ export function ChatPanel({ activeSection, onRoomSelect }: ChatPanelProps) {
           )}
         </div>
 
-        {/* Diary sub-section */}
+        {/* Agent logs sub-section */}
         <div
-          style={{ display: logsSubTab === 'diary' ? 'flex' : 'none' }}
+          style={{ display: logsSubTab === 'logs' ? 'flex' : 'none' }}
           className="flex-1 min-h-0 flex flex-col overflow-hidden"
         >
-          <DiaryTab agentColorMap={agentColorMap} />
+          <AgentLogsTab agentColorMap={agentColorMap} />
         </div>
       </div>
 

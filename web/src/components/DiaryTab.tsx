@@ -1,15 +1,15 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { supabase } from '../lib/supabase';
-import { ChevronDown, ChevronLeft, ChevronRight, BookOpen } from 'lucide-react';
+import { ChevronDown, ChevronLeft, ChevronRight, Activity } from 'lucide-react';
 
-interface DiaryEntry {
+interface AgentLog {
   id: number;
   ts: string;
   agent_id: string;
   text: string;
 }
 
-interface DiaryTabProps {
+interface AgentLogsTabProps {
   agentColorMap: Record<string, string>;
 }
 
@@ -47,8 +47,8 @@ function getDateKey(iso: string): string {
   }
 }
 
-export function DiaryTab({ agentColorMap }: DiaryTabProps) {
-  const [entries, setEntries] = useState<DiaryEntry[]>([]);
+export function AgentLogsTab({ agentColorMap }: AgentLogsTabProps) {
+  const [entries, setEntries] = useState<AgentLog[]>([]);
   const [agentMap, setAgentMap] = useState<Record<string, string>>({});
   const [selectedAgent, setSelectedAgent] = useState<string>('all');
   const [loading, setLoading] = useState(true);
@@ -64,14 +64,14 @@ export function DiaryTab({ agentColorMap }: DiaryTabProps) {
 
   const loadEntries = useCallback(async () => {
     const { data, error } = await supabase
-      .from('diary_entries')
+      .from('agent_logs')
       .select('id, ts, agent_id, text')
       .order('ts', { ascending: false });
 
-    if (error) { console.error('Error loading diary entries', error); return; }
+    if (error) { console.error('Error loading agent logs', error); return; }
     if (!isMounted.current || !data) return;
 
-    const ordered = (data as DiaryEntry[]).reverse();
+    const ordered = (data as AgentLog[]).reverse();
     setEntries(ordered);
 
     const dateToCount: Record<string, number> = {};
@@ -113,8 +113,8 @@ export function DiaryTab({ agentColorMap }: DiaryTabProps) {
 
   useEffect(() => {
     const channel = supabase
-      .channel('public:diary_entries')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'diary_entries' }, () => {
+      .channel('public:agent_logs')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'agent_logs' }, () => {
         loadEntries();
       })
       .subscribe();
@@ -151,8 +151,8 @@ export function DiaryTab({ agentColorMap }: DiaryTabProps) {
       {/* Header */}
       <div className="bg-white border-b border-stone-200 px-4 py-3 flex items-center gap-3 flex-wrap flex-shrink-0">
         <div className="flex items-center gap-1.5 text-stone-600">
-          <BookOpen className="w-4 h-4" />
-          <span className="text-sm font-semibold text-stone-700">Agent Diaries</span>
+          <Activity className="w-4 h-4" />
+          <span className="text-sm font-semibold text-stone-700">Agent Logs</span>
         </div>
 
         {/* Date nav */}
@@ -203,24 +203,15 @@ export function DiaryTab({ agentColorMap }: DiaryTabProps) {
         </div>
       </div>
 
-      {/* Diary entries */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-stone-50">
+      {/* Log entries */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-1.5 bg-stone-50">
         {loading && (
-          <div className="space-y-3">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="bg-white rounded-xl border border-stone-200 p-4 animate-pulse">
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="w-9 h-9 rounded-full bg-stone-200" />
-                  <div className="space-y-1.5 flex-1">
-                    <div className="h-3.5 bg-stone-200 rounded w-1/4" />
-                    <div className="h-3 bg-stone-100 rounded w-1/6" />
-                  </div>
-                </div>
-                <div className="space-y-1.5">
-                  <div className="h-3.5 bg-stone-100 rounded w-full" />
-                  <div className="h-3.5 bg-stone-100 rounded w-5/6" />
-                  <div className="h-3.5 bg-stone-100 rounded w-3/4" />
-                </div>
+          <div className="space-y-1.5">
+            {[1, 2, 3, 4, 5].map((i) => (
+              <div key={i} className="flex items-center gap-2.5 px-3 py-2 animate-pulse">
+                <div className="w-7 h-7 rounded-full bg-stone-200 flex-shrink-0" />
+                <div className="h-3.5 bg-stone-200 rounded flex-1" />
+                <div className="h-3 bg-stone-100 rounded w-10" />
               </div>
             ))}
           </div>
@@ -228,12 +219,12 @@ export function DiaryTab({ agentColorMap }: DiaryTabProps) {
 
         {entries.length === 0 && !loading && (
           <div className="text-center py-12 text-sm text-stone-400">
-            No diary entries yet. Agents will begin writing after a few ticks.
+            No activity logs yet.
           </div>
         )}
 
         {entries.length > 0 && filteredEntries.length === 0 && !loading && (
-          <div className="text-center py-12 text-sm text-stone-400">No diary entries on this day.</div>
+          <div className="text-center py-12 text-sm text-stone-400">No logs on this day.</div>
         )}
 
         {filteredEntries.map((entry) => {
@@ -245,21 +236,16 @@ export function DiaryTab({ agentColorMap }: DiaryTabProps) {
           return (
             <div
               key={entry.id}
-              className="bg-white rounded-xl border border-stone-200 p-4 animate-slide-in"
+              className="flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-white transition-colors"
             >
-              <div className="flex items-center gap-2.5 mb-3">
-                <div
-                  className="w-9 h-9 rounded-full flex items-center justify-center text-white font-semibold text-sm flex-shrink-0"
-                  style={{ backgroundColor: hex }}
-                >
-                  {agentName[0] || '?'}
-                </div>
-                <div>
-                  <div className="text-sm font-semibold text-stone-800">{agentName}</div>
-                  <div className="text-xs text-stone-400">{time}</div>
-                </div>
+              <div
+                className="w-7 h-7 rounded-full flex items-center justify-center text-white font-semibold text-xs flex-shrink-0"
+                style={{ backgroundColor: hex }}
+              >
+                {agentName[0] || '?'}
               </div>
-              <p className="text-sm text-stone-600 italic leading-relaxed">{entry.text}</p>
+              <span className="text-sm text-stone-600 flex-1">{entry.text}</span>
+              <span className="text-xs text-stone-400 flex-shrink-0">{time}</span>
             </div>
           );
         })}

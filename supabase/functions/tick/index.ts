@@ -23,7 +23,6 @@ interface Persona {
 
 interface AgentMemory {
   alone_ticks?: number;
-  last_diary_tick?: number;
 }
 
 interface Agent {
@@ -539,62 +538,6 @@ Reply with ONLY the JSON object. Nothing else.
 }
 
 /* ------------------------------------------------------------------ */
-/*  Diary generation                                                   */
-/* ------------------------------------------------------------------ */
-
-async function generateDiaryEntry(
-  agent: Agent,
-  history: MessageSummary[]
-): Promise<string | null> {
-  if (!openai) return null;
-
-  const persona = agent.persona ?? {};
-  const traits = persona.traits ?? [];
-
-  const recentLines = history
-    .map((m) => m.content?.trim())
-    .filter((c): c is string => !!c)
-    .slice(0, 5);
-
-  const recentText =
-    recentLines.length > 0
-      ? recentLines.map((c) => `- ${c}`).join("\n")
-      : "- (quiet day, not much happened)";
-
-  const prompt = `
-You are ${agent.name}, a cosy villager. Traits: ${traits.join(", ") || "versatile"}.
-Current mood: ${agent.mood} (-5 to 5 scale). Energy: ${agent.energy}/5.
-
-Recent things you've been doing:
-${recentText}
-
-Write a brief private diary entry (2-3 sentences) reflecting on your recent experiences.
-Write in first person. Be introspective and match your personality.
-No emojis. Just the diary text, nothing else.
-`;
-
-  try {
-    const response = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [
-        {
-          role: "system",
-          content: `You are ${agent.name} writing in your private diary. Be reflective and personal.`
-        },
-        { role: "user", content: prompt }
-      ],
-      temperature: 0.9
-    });
-
-    const content = response.choices[0]?.message?.content?.trim() ?? "";
-    return content || null;
-  } catch (err: unknown) {
-    console.error("Diary generation error:", (err as Error)?.message ?? String(err));
-    return null;
-  }
-}
-
-/* ------------------------------------------------------------------ */
 /*  Main tick handler                                                  */
 /* ------------------------------------------------------------------ */
 
@@ -758,20 +701,14 @@ serve(async (req: Request) => {
             const nextRoomName = nextRoom.name ?? `room ${nextRoomId.substring(0, 8)}`;
             const movementMsg = generateMovementMessage(agent, nextRoomName);
 
-            const { error: msgErr } = await supabase.from("messages").insert({
-              from_agent: agent.id,
-              room_id: nextRoomId,
-              content: movementMsg,
-              mood_tag: "neutral",
-              channel: "group",
+            const { error: logErr } = await supabase.from("agent_logs").insert({
+              agent_id: agent.id,
+              text: movementMsg,
             });
 
-            if (msgErr) {
-              console.error("Error inserting movement message:", msgErr);
-              continue;
+            if (logErr) {
+              console.error("Error inserting movement log:", logErr);
             }
-
-            inserted += 1;
           }
         }
       } catch (moveErr: unknown) {
@@ -835,14 +772,11 @@ serve(async (req: Request) => {
       // Energy check: if depleted, rest
       if (agent.energy <= 0) {
         const restMsg = `${agent.name} rests quietly, eyes half-closed.`;
-        const { error } = await supabase.from("messages").insert({
-          from_agent: agent.id,
-          room_id: agent.room_id,
-          content: restMsg,
-          mood_tag: "neutral",
-          channel: "group",
+        const { error } = await supabase.from("agent_logs").insert({
+          agent_id: agent.id,
+          text: restMsg,
         });
-        if (!error) inserted += 1;
+        if (error) console.error("Error inserting rest log:", error);
 
         // Rest restores energy, but being depleted hurts mood
         const newEnergy = clamp(agent.energy + 2, 0, 5);
@@ -934,39 +868,7 @@ serve(async (req: Request) => {
     // didn't act at all (shouldn't happen, but just in case) get +1
 
     // ----------------------------------------------------------
-    // Phase 5: Diary entries (staggered, ~1 per agent per 10 ticks)
-    // ----------------------------------------------------------
-    for (let i = 0; i < refreshedAgents.length; i++) {
-      const agent = refreshedAgents[i];
-      if (tickCount % 10 !== i % 10) continue;
-
-      const memory: AgentMemory = (agent.memory as AgentMemory) ?? {};
-      // Skip if already wrote a diary this cycle
-      if (memory.last_diary_tick && memory.last_diary_tick >= tickCount - 5) continue;
-
-      // Filter group history to this agent's messages for diary context
-      const agentHistory = groupHistory.filter((m) => m.from_agent === agent.id);
-      const diaryText = await generateDiaryEntry(agent, agentHistory);
-
-      if (diaryText) {
-        const { error } = await supabase.from("diary_entries").insert({
-          agent_id: agent.id,
-          text: diaryText,
-        });
-
-        if (error) {
-          console.error("Error inserting diary entry:", error);
-        } else {
-          // Update memory with last diary tick
-          await supabase.from("agents").update({
-            memory: { ...memory, last_diary_tick: tickCount },
-          }).eq("id", agent.id);
-        }
-      }
-    }
-
-    // ----------------------------------------------------------
-    // Phase 6: Increment tick counter
+    // Phase 5: Increment tick counter
     // ----------------------------------------------------------
     const { error: tickErr } = await supabase.rpc("increment_tick_count");
     if (tickErr) {
