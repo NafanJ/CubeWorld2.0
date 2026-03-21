@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { PALETTE, buildAgentColorMap } from '../lib/colorUtils';
 import { ChatLogTab } from './ChatLogTab';
@@ -13,14 +13,17 @@ type LogsSubTab = 'chat' | 'diary';
 
 interface ChatPanelProps {
   activeSection: ActiveTab;
+  onRoomSelect?: () => void;
 }
 
-export function ChatPanel({ activeSection }: ChatPanelProps) {
+export function ChatPanel({ activeSection, onRoomSelect }: ChatPanelProps) {
   const [agentColorMap, setAgentColorMap] = useState<Record<string, string>>({});
   const [agentNameMap, setAgentNameMap] = useState<Record<string, string>>({});
   const [logsSubTab, setLogsSubTab] = useState<LogsSubTab>('chat');
   // null = conversation list, 'group' = group chat thread, agentId = DM thread
   const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
+  const [animatingSection, setAnimatingSection] = useState<ActiveTab | null>(null);
+  const prevSectionRef = useRef<ActiveTab>(activeSection);
 
   // Load agents to build color map for consistency across all sections
   useEffect(() => {
@@ -81,20 +84,34 @@ export function ChatPanel({ activeSection }: ChatPanelProps) {
     };
   }, []);
 
+  useEffect(() => {
+    if (prevSectionRef.current !== activeSection) {
+      prevSectionRef.current = activeSection;
+      setAnimatingSection(activeSection);
+      const t = setTimeout(() => setAnimatingSection(null), 220);
+      return () => clearTimeout(t);
+    }
+  }, [activeSection]);
+
+  const handleRoomSelect = useCallback(() => {
+    setSelectedConversation('group');
+    onRoomSelect?.();
+  }, [onRoomSelect]);
+
   return (
     <div className="flex flex-col h-full">
       {/* Overview — room grid */}
       <div
         style={{ display: activeSection === 'overview' ? 'flex' : 'none' }}
-        className="flex-1 min-h-0 overflow-auto bg-stone-50 items-start lg:items-center justify-center p-4 lg:p-8"
+        className={`flex-1 min-h-0 overflow-auto bg-stone-50 items-start lg:items-center justify-center p-4 lg:p-8${animatingSection === 'overview' ? ' tab-content-enter' : ''}`}
       >
-        <PixelRoomGrid agentColorMap={agentColorMap} />
+        <PixelRoomGrid agentColorMap={agentColorMap} onRoomSelect={handleRoomSelect} />
       </div>
 
       {/* Directory — villager cards */}
       <div
         style={{ display: activeSection === 'directory' ? 'flex' : 'none' }}
-        className="flex-1 min-h-0 flex flex-col overflow-hidden"
+        className={`flex-1 min-h-0 flex flex-col overflow-hidden${animatingSection === 'directory' ? ' tab-content-enter' : ''}`}
       >
         <StatusTab agentColorMap={agentColorMap} />
       </div>
@@ -102,7 +119,7 @@ export function ChatPanel({ activeSection }: ChatPanelProps) {
       {/* Logs — chat + diary */}
       <div
         style={{ display: activeSection === 'logs' ? 'flex' : 'none' }}
-        className="flex-1 min-h-0 flex flex-col overflow-hidden"
+        className={`flex-1 min-h-0 flex flex-col overflow-hidden${animatingSection === 'logs' ? ' tab-content-enter' : ''}`}
       >
         {/* Logs sub-tab nav */}
         <div className="flex border-b border-stone-200 bg-white px-4 flex-shrink-0">
@@ -162,7 +179,7 @@ export function ChatPanel({ activeSection }: ChatPanelProps) {
       {/* System — stats + controls */}
       <div
         style={{ display: activeSection === 'system' ? 'flex' : 'none' }}
-        className="flex-1 min-h-0 flex flex-col overflow-hidden"
+        className={`flex-1 min-h-0 flex flex-col overflow-hidden${animatingSection === 'system' ? ' tab-content-enter' : ''}`}
       >
         <SystemTab />
       </div>

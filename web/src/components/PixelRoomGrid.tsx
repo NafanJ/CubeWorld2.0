@@ -15,9 +15,10 @@ interface RoomUI {
 
 interface PixelRoomGridProps {
   agentColorMap?: Record<string, string>;
+  onRoomSelect?: () => void;
 }
 
-export const PixelRoomGrid: React.FC<PixelRoomGridProps> = ({ agentColorMap = {} }) => {
+export const PixelRoomGrid: React.FC<PixelRoomGridProps> = ({ agentColorMap = {}, onRoomSelect }) => {
   const [rooms, setRooms] = useState<RoomUI[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -154,6 +155,7 @@ export const PixelRoomGrid: React.FC<PixelRoomGridProps> = ({ agentColorMap = {}
               agentColorMap={agentColorMap}
               roomName={room.roomName}
               backgroundImage={room.backgroundImage}
+              onClick={onRoomSelect}
             />
           </div>
         ))}
@@ -180,6 +182,7 @@ export const PixelRoomGrid: React.FC<PixelRoomGridProps> = ({ agentColorMap = {}
                 agentColorMap={agentColorMap}
                 roomName={room.roomName}
                 backgroundImage={room.backgroundImage}
+                onClick={onRoomSelect}
               />
             )}
           </div>

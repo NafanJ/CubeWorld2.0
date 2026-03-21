@@ -39,7 +39,7 @@ export function ChatMessage({ username, message, timestamp, color, avatar }: Cha
           </span>
           <span className="text-xs text-stone-400">{timestamp}</span>
         </div>
-        <p className={`text-sm leading-relaxed ${isVisitor ? 'text-stone-400 italic' : 'text-stone-700'}`}>
+        <p className={`text-sm leading-relaxed break-words ${isVisitor ? 'text-stone-400 italic' : 'text-stone-700'}`}>
           {message}
         </p>
       </div>

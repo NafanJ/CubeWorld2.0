@@ -15,6 +15,7 @@ interface RoomCardProps {
   agentColorMap?: Record<string, string>;
   roomName?: string;
   backgroundImage?: string;
+  onClick?: () => void;
 }
 
 export function RoomCard({
@@ -24,11 +25,12 @@ export function RoomCard({
   agentColorMap = {},
   roomName,
   backgroundImage,
+  onClick,
 }: RoomCardProps) {
   return (
-    <div className="w-full h-full">
+    <div className={`w-full h-full${onClick ? ' cursor-pointer' : ''}`} onClick={onClick}>
       <div
-        className="w-full h-full relative overflow-hidden rounded-xl bg-stone-300 bg-cover bg-center"
+        className={`w-full h-full relative overflow-hidden rounded-xl bg-stone-300 bg-cover bg-center transition-all duration-150${onClick ? ' hover:ring-2 hover:ring-emerald-400 hover:ring-inset hover:brightness-105' : ''}`}
         style={
           backgroundImage
             ? { backgroundImage: `url(${backgroundImage})`, backgroundSize: 'cover', backgroundPosition: 'center' }

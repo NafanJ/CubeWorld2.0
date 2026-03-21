@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { ChatMessage } from './ChatMessage';
 import { supabase } from '../lib/supabase';
 import { PALETTE } from '../lib/colorUtils';
-import { ArrowLeft, Send, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ArrowLeft, ChevronDown, Send, ChevronLeft, ChevronRight } from 'lucide-react';
 
 type SupaMessage = {
   id: number;
@@ -483,19 +483,22 @@ export function ChatLogTab({ agentColorMap: parentAgentColorMap, agentNameMap, d
             </div>
 
             {/* Agent filter */}
-            <select
-              value={selectedAgent}
-              onChange={(e) => setSelectedAgent(e.target.value)}
-              className="ml-auto text-xs px-2.5 py-1.5 rounded-lg bg-stone-100 text-stone-600 border border-stone-200 focus:outline-none focus:ring-1 focus:ring-emerald-400"
-            >
-              <option value="all">All agents</option>
-              <option value="anon">Visitors</option>
-              {Object.entries(agentMap)
-                .sort((a, b) => a[1].localeCompare(b[1]))
-                .map(([id, name]) => (
-                  <option key={id} value={id}>{name}</option>
-                ))}
-            </select>
+            <div className="relative ml-auto">
+              <select
+                value={selectedAgent}
+                onChange={(e) => setSelectedAgent(e.target.value)}
+                className="appearance-none bg-white border border-stone-200 rounded-lg pl-3 pr-7 py-1.5 text-xs text-stone-700 cursor-pointer focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+              >
+                <option value="all">All agents</option>
+                <option value="anon">Visitors</option>
+                {Object.entries(agentMap)
+                  .sort((a, b) => a[1].localeCompare(b[1]))
+                  .map(([id, name]) => (
+                    <option key={id} value={id}>{name}</option>
+                  ))}
+              </select>
+              <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-stone-400 pointer-events-none" />
+            </div>
           </div>
         )}
       </div>
@@ -560,6 +563,11 @@ export function ChatLogTab({ agentColorMap: parentAgentColorMap, agentNameMap, d
       <div className="bg-white border-t border-stone-200 px-4 py-3 flex-shrink-0 relative">
         {sending && (
           <p className="text-xs text-emerald-600 mb-2 animate-pulse">Villagers are thinking…</p>
+        )}
+        {userInput.length >= 150 && (
+          <p className={`text-xs font-medium mb-1.5 text-right ${userInput.length >= 190 ? 'text-red-500' : 'text-amber-500'}`}>
+            {200 - userInput.length} characters left
+          </p>
         )}
 
         {/* @mention dropdown */}

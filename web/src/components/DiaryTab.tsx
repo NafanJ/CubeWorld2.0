@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { supabase } from '../lib/supabase';
-import { ChevronLeft, ChevronRight, BookOpen } from 'lucide-react';
+import { ChevronDown, ChevronLeft, ChevronRight, BookOpen } from 'lucide-react';
 
 interface DiaryEntry {
   id: number;
@@ -186,18 +186,21 @@ export function DiaryTab({ agentColorMap }: DiaryTabProps) {
         </div>
 
         {/* Agent filter */}
-        <select
-          value={selectedAgent}
-          onChange={(e) => setSelectedAgent(e.target.value)}
-          className="ml-auto text-xs px-2.5 py-1.5 rounded-lg bg-stone-100 text-stone-600 border border-stone-200 focus:outline-none focus:ring-1 focus:ring-emerald-400"
-        >
-          <option value="all">All agents</option>
-          {Object.entries(agentMap)
-            .sort((a, b) => a[1].localeCompare(b[1]))
-            .map(([id, name]) => (
-              <option key={id} value={id}>{name}</option>
-            ))}
-        </select>
+        <div className="relative ml-auto">
+          <select
+            value={selectedAgent}
+            onChange={(e) => setSelectedAgent(e.target.value)}
+            className="appearance-none bg-white border border-stone-200 rounded-lg pl-3 pr-7 py-1.5 text-xs text-stone-700 cursor-pointer focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+          >
+            <option value="all">All agents</option>
+            {Object.entries(agentMap)
+              .sort((a, b) => a[1].localeCompare(b[1]))
+              .map(([id, name]) => (
+                <option key={id} value={id}>{name}</option>
+              ))}
+          </select>
+          <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-stone-400 pointer-events-none" />
+        </div>
       </div>
 
       {/* Diary entries */}
