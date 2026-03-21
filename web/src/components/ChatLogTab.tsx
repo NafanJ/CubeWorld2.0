@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { ChatMessage } from './ChatMessage';
 import { supabase } from '../lib/supabase';
 import { PALETTE } from '../lib/colorUtils';
-import { ArrowLeft, Send, ChevronRight } from 'lucide-react';
+import { ArrowLeft, Send, ChevronRight, MoreHorizontal } from 'lucide-react';
 
 type SupaMessage = {
   id: number;
@@ -75,6 +75,7 @@ export function ChatLogTab({ agentColorMap: parentAgentColorMap, agentNameMap, d
   const messagesRef = useRef<SupaMessage[]>([]);
   const hasScrolledRef = useRef<boolean>(false);
   const [newMessageCount, setNewMessageCount] = useState(0);
+  const [typingAgents, setTypingAgents] = useState<Array<{ id: string; name: string }>>([]);
   const isMounted = useRef(true);
 
   useEffect(() => {
@@ -374,6 +375,30 @@ export function ChatLogTab({ agentColorMap: parentAgentColorMap, agentNameMap, d
 
   useEffect(() => { messagesRef.current = messages; }, [messages]);
 
+  // Poll for typing indicators (every 2 seconds)
+  useEffect(() => {
+    let mounted = true;
+    const pollTyping = async () => {
+      const fifteenSecondsAgo = new Date(Date.now() - 15000).toISOString();
+      const { data } = await supabase
+        .from('agents')
+        .select('id, name, typing_as_of')
+        .not('typing_as_of', 'is', null)
+        .gte('typing_as_of', fifteenSecondsAgo);
+
+      if (!mounted) return;
+      if (data && data.length > 0) {
+        setTypingAgents(data.map((a: { id: string; name: string }) => ({ id: a.id, name: a.name })));
+      } else {
+        setTypingAgents([]);
+      }
+    };
+
+    pollTyping();
+    const interval = setInterval(pollTyping, 2000);
+    return () => { mounted = false; clearInterval(interval); };
+  }, []);
+
   return (
     <>
       {/* Header */}
@@ -464,6 +489,16 @@ export function ChatLogTab({ agentColorMap: parentAgentColorMap, agentNameMap, d
         </div>
         <div ref={messagesEndRef} />
       </div>
+
+      {/* Typing indicator */}
+      {typingAgents.length > 0 && (
+        <div className="bg-white px-4 py-1.5 flex items-center gap-2 flex-shrink-0">
+          <MoreHorizontal className="w-4 h-4 text-stone-400 animate-pulse" />
+          <span className="text-xs text-stone-500 animate-pulse">
+            {typingAgents.map((a) => a.name).join(', ')} {typingAgents.length === 1 ? 'is' : 'are'} typing...
+          </span>
+        </div>
+      )}
 
       {/* Input area */}
       <div className="bg-white border-t border-stone-200 px-4 py-3 flex-shrink-0 relative">

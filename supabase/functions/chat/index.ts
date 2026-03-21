@@ -256,28 +256,28 @@ async function generateMessage(
   }
 
   const prompt = `
-You are ${agent.name}, a villager in Cozy Village — a tiny 2x3 apartment block.
-You are currently in "${roomName}". Mood: ${agent.mood}/5. Energy: ${agent.energy}/5.
+You are ${agent.name}. You live in Cozy Village with your friends.
+You're in "${roomName}" right now. Mood: ${agent.mood}/5. Energy: ${agent.energy}/5.
 ${personalityPrompt}
 ${extraContext}
 
-Here is the recent group chat (oldest first):
+Recent group chat:
 
 ${groupChatText}
 
-Write your next message to the group chat. This is a CHAT — you are TALKING to the other villagers.
+Send your next message. Talk like a real person texting their friends — casual, relaxed, lowercase ok.
 
-IMPORTANT RULES:
-- Write DIALOGUE, not narration. Say things out loud to the group. Talk, ask questions, reply, joke, share thoughts.
-- GOOD examples: "Hey Pip, what are you reading?", "Has anyone been to the garden today? The flowers smell amazing.", "I just made tea, anyone want some?"
-- BAD examples (do NOT write like this): "I quietly pull out my book", "I hum a tune while preparing snacks", "I observe Odo's movements"
-- If someone asked a question or said something interesting, RESPOND to them directly.
-- Use the other villagers' names when talking to them.
-- Keep it short, warm, and natural — like texting friends.
+Rules:
+- Talk TO people, not ABOUT what you're doing. This is a chat, not a diary.
+- If someone said something to you or asked a question, reply to THEM.
+- Use short, casual language. Contractions, slang, incomplete sentences are fine.
+- GOOD: "hey pip whats that book about?", "ugh im so tired lol", "anyone wanna grab tea?", "ooh nice, can i see?"
+- BAD: "I ponder the fragrance of blooming tales", "What genre stirs your soul?", "Silence lingers, yet whispers tell stories"
+- Don't be poetic or philosophical. Be normal. Be chill.
+- No emojis.
 
-Reply with ONLY a JSON object: {"message": "<your chat message>", "mood_delta": <-1, 0, or 1>}
-Max ~100 characters. No emojis. No narration of actions.
-${varietyInstructions}
+JSON only: {"message": "<your message>", "mood_delta": <-1, 0, or 1>}
+Max ~80 chars. ${varietyInstructions}
 `;
 
   async function callOnce(): Promise<GenerateResult | null> {
@@ -286,7 +286,7 @@ ${varietyInstructions}
       messages: [
         {
           role: "system",
-          content: `You are ${agent.name} with these traits: ${traits.join(", ") || "versatile"}. You are chatting with friends in a group chat. Write DIALOGUE — talk to people, reply to them, ask questions, share thoughts. Never narrate actions in third person. Always respond with valid JSON: {"message": "...", "mood_delta": -1|0|1}`
+          content: `You are ${agent.name}. Traits: ${traits.join(", ") || "chill"}. You're texting your friends in a group chat. Be casual and natural — like how real people actually text. Short sentences, lowercase fine, no fancy vocabulary. Never narrate actions or be poetic. JSON only: {"message": "...", "mood_delta": -1|0|1}`
         },
         { role: "user", content: prompt }
       ],
@@ -445,6 +445,26 @@ serve(async (req: Request) => {
       if (roll <= 0) { pickedIndex = i; break; }
     }
 
+    // Helper: set typing indicator on an agent
+    async function setTyping(agentId: string) {
+      await supabase.from("agents").update({
+        typing_as_of: new Date().toISOString(),
+      }).eq("id", agentId);
+    }
+
+    // Helper: clear typing indicator
+    async function clearTyping(agentId: string) {
+      await supabase.from("agents").update({
+        typing_as_of: null,
+      }).eq("id", agentId);
+    }
+
+    // Helper: simulate typing delay (2-4 seconds)
+    function typingDelay(): Promise<void> {
+      const ms = 2000 + Math.floor(Math.random() * 2000);
+      return new Promise((resolve) => setTimeout(resolve, ms));
+    }
+
     // --- Send message and allow reply chain (max 3 total) ---
     const MAX_CHAIN = 3;
     const spokeDuringChain = new Set<string>();
@@ -454,6 +474,10 @@ serve(async (req: Request) => {
     for (let turn = 0; turn < MAX_CHAIN; turn++) {
       if (spokeDuringChain.has(currentAgent.id)) break;
       if (currentAgent.energy <= 0) break;
+
+      // Show typing indicator (with delay for replies, not the first message)
+      await setTyping(currentAgent.id);
+      if (turn > 0) await typingDelay();
 
       const room = roomsMap.get(currentAgent.room_id!);
 
@@ -471,6 +495,9 @@ serve(async (req: Request) => {
       }
 
       const result = await generateMessage(currentAgent, liveHistory, nameMap, room, extraContext);
+
+      // Clear typing and insert message
+      await clearTyping(currentAgent.id);
 
       const { error } = await supabase.from("messages").insert({
         from_agent: currentAgent.id,
@@ -526,16 +553,38 @@ serve(async (req: Request) => {
         last_tick_at: new Date().toISOString(),
       }).eq("id", currentAgent.id);
 
-      // Check if the message mentions another agent by name → they reply next
-      const mentionedAgent = eligibleAgents.find((a) =>
+      // Determine next speaker: explicit mention, or random continuation
+      const msgLower = result.message.toLowerCase();
+
+      // 1. Check for explicit name mention
+      let nextAgent = eligibleAgents.find((a) =>
         a.id !== currentAgent.id &&
         !spokeDuringChain.has(a.id) &&
         a.energy > 0 &&
-        result.message.toLowerCase().includes(a.name.toLowerCase())
+        msgLower.includes(a.name.toLowerCase())
       );
 
-      if (!mentionedAgent) break;
-      currentAgent = mentionedAgent;
+      // 2. If no explicit mention but the message is conversational (question mark,
+      //    or general address), ~60% chance a random eligible agent jumps in
+      if (!nextAgent && spokeDuringChain.size < MAX_CHAIN) {
+        const isQuestion = msgLower.includes("?") ||
+          msgLower.includes("anyone") || msgLower.includes("you guys");
+        const jumpInChance = isQuestion ? 0.6 : 0.3;
+
+        if (Math.random() < jumpInChance) {
+          const candidates = eligibleAgents.filter((a) =>
+            a.id !== currentAgent.id &&
+            !spokeDuringChain.has(a.id) &&
+            a.energy > 0
+          );
+          if (candidates.length > 0) {
+            nextAgent = candidates[Math.floor(Math.random() * candidates.length)];
+          }
+        }
+      }
+
+      if (!nextAgent) break;
+      currentAgent = nextAgent;
     }
 
     return new Response(
