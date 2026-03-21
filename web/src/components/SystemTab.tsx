@@ -60,8 +60,10 @@ export function SystemTab() {
     setTickResult(null);
     setTickResultVisible(false);
     try {
-      const { error } = await supabase.functions.invoke('tick', { method: 'POST' });
-      if (error) throw error;
+      const { error: tickError } = await supabase.functions.invoke('tick', { method: 'POST' });
+      if (tickError) throw tickError;
+      const { error: chatError } = await supabase.functions.invoke('chat', { method: 'POST' });
+      if (chatError) throw chatError;
       setTickResult('success');
       setTickResultVisible(true);
       setTimeout(() => setTickResultVisible(false), 2000);
