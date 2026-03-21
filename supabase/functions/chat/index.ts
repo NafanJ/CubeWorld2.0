@@ -282,9 +282,9 @@ Rules:
 - Don't be poetic or philosophical. Be normal. Be chill.
 - No emojis.
 
-JSON only: {"message": "<your message>", "mood_delta": <-1, 0, or 1>, "journal": "<1-line summary of this moment, or null>", "new_fact": "<an important fact worth remembering, or null>"}
-- journal: a short note about what just happened (e.g. "Talked with Pip about his bookshelf project")
-- new_fact: something you learned or decided that you'd want to remember later (e.g. "Pip is building a bookshelf from reclaimed wood"). Only include if genuinely noteworthy.
+JSON only: {"message": "<your message>", "mood_delta": <-1, 0, or 1>, "journal": "<1-line summary INCLUDING key details, or null>", "new_fact": "<a specific fact worth remembering, or null>"}
+- journal: capture WHAT happened, not just that it happened. GOOD: "Told Pip I've been reading a mystery novel". BAD: "Talked about books"
+- new_fact: specific things you said, decided, or learned. GOOD: "Pip is building a bookshelf from reclaimed wood". BAD: null. Always save facts when you share opinions, preferences, or learn something about someone.
 Max ~80 chars for the message. ${varietyInstructions}
 `;
 
